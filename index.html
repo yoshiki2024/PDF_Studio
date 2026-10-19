@@ -51,7 +51,8 @@
           <div class="page-icon">📑</div>
           <h1 class="page-title">PDF_Studio</h1>
           <p class="page-description">
-            結合・分解・向きの変更・テキスト編集を直感的操作で行えます。<br>
+            ビジネスパーソンのための、<strong>「完全ローカル・安心安全・インストール不要」</strong>な高機能PDF加工・編集ツールです。<br>
+            直感的で洗練されたUIにより、PDFの結合・分解・向きの変更・テキスト編集をスムーズに行えます。<br>
             すべての処理はお使いのPC（ブラウザ内）で完結するため外部サーバーへの送信は一切なく、<span class="text-nowrap">元のファイルは一切上書きされません。</span>
           </p>
         </div>
@@ -354,6 +355,17 @@
             </button>
             <span class="header-divider">|</span>
             <span class="active-page-title">📄 ページ <span id="current-edit-page-num">1</span> の編集</span>
+            <span class="header-divider">|</span>
+            <div class="history-controls">
+              <button type="button" class="btn-notion btn-ghost btn-sm" id="btn-undo" title="元に戻す (Ctrl+Z)" disabled>
+                <i data-lucide="undo-2"></i>
+                <span>元に戻す</span>
+              </button>
+              <button type="button" class="btn-notion btn-ghost btn-sm" id="btn-redo" title="やり直す (Ctrl+Y)" disabled>
+                <i data-lucide="redo-2"></i>
+                <span>進む</span>
+              </button>
+            </div>
           </div>
           <div class="edit-workspace-actions">
             <button class="btn-notion btn-secondary" id="btn-cancel-single-edit">キャンセル</button>
@@ -398,12 +410,51 @@
               </div>
 
               <div class="prop-group">
-                <label>フォント:</label>
+                <div class="label-with-action">
+                  <label for="text-font-family">フォント:</label>
+                  <button type="button" class="btn-text-link" id="btn-toggle-custom-font" title="フォント名を手動入力">手動入力</button>
+                </div>
                 <select id="text-font-family" class="notion-select">
-                  <option value="Noto Sans JP, sans-serif">ゴシック体 (Noto Sans)</option>
-                  <option value="'Times New Roman', serif">明朝体・セリフ</option>
-                  <option value="'Courier New', monospace">等幅 (Courier)</option>
+                  <optgroup label="定番・ゴシック体">
+                    <option value="'Noto Sans JP', sans-serif">Noto Sans JP (標準ゴシック)</option>
+                    <option value="'Yu Gothic', '游ゴシック', sans-serif">游ゴシック (Yu Gothic)</option>
+                    <option value="'Meiryo', 'メイリオ', sans-serif">メイリオ (Meiryo)</option>
+                    <option value="'MS PGothic', 'ＭＳ Ｐゴシック', sans-serif">ＭＳ Ｐゴシック</option>
+                    <option value="'BIZ UDPGothic', 'BIZ UDPゴシック', sans-serif">BIZ UDPゴシック (ユニバーサル)</option>
+                    <option value="'Hiragino Sans', 'ヒラギノ角ゴ', sans-serif">ヒラギノ角ゴ (Mac標準)</option>
+                  </optgroup>
+                  <optgroup label="明朝体 (フォーマル・書類)">
+                    <option value="'Noto Serif JP', serif">Noto Serif JP (明朝体)</option>
+                    <option value="'Yu Mincho', '游明朝', serif">游明朝 (Yu Mincho)</option>
+                    <option value="'MS PMincho', 'ＭＳ Ｐ明朝', serif">ＭＳ Ｐ明朝</option>
+                    <option value="'BIZ UDPMincho', 'BIZ UDP明朝', serif">BIZ UDP明朝</option>
+                  </optgroup>
+                  <optgroup label="等幅・数字・コード">
+                    <option value="'Roboto Mono', monospace">Roboto Mono (等幅英数)</option>
+                    <option value="'MS Gothic', 'ＭＳ ゴシック', monospace">ＭＳ ゴシック (等幅)</option>
+                    <option value="'Consolas', monospace">Consolas</option>
+                    <option value="'Courier New', monospace">Courier New</option>
+                  </optgroup>
+                  <optgroup label="欧文フォント">
+                    <option value="'Inter', sans-serif">Inter (モダンサンセリフ)</option>
+                    <option value="'Arial', sans-serif">Arial</option>
+                    <option value="'Helvetica', sans-serif">Helvetica</option>
+                    <option value="'Times New Roman', serif">Times New Roman</option>
+                    <option value="'Georgia', serif">Georgia</option>
+                  </optgroup>
                 </select>
+
+                <!-- PCローカルフォント一括読み込みボタン -->
+                <button type="button" id="btn-load-pc-fonts" class="btn-notion btn-secondary btn-sm w-full font-load-btn" style="margin-top: 6px; font-size: 11px; justify-content: center; gap: 6px;">
+                  <i data-lucide="laptop"></i>
+                  <span>PC内の全フォントを読み込む</span>
+                </button>
+
+                <!-- 手動カスタムフォント名入力（非表示トグル） -->
+                <div id="custom-font-group" class="custom-font-input-wrapper hidden" style="margin-top: 6px;">
+                  <input type="text" id="custom-font-input" class="notion-input" style="font-size: 12px;" placeholder="フォント名を入力 (例: HGP創英角ﾎﾟｯﾌﾟ体)">
+                  <button type="button" id="btn-apply-custom-font" class="btn-notion btn-secondary btn-sm w-full" style="margin-top: 4px; font-size: 11px; justify-content: center;">フォント名を適用</button>
+                </div>
               </div>
 
               <!-- Style Buttons: Bold, Italic, Color -->

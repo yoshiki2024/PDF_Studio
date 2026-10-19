@@ -360,7 +360,9 @@ const state = {
   },
   activeHighlightColor: '#FFF275',
   zoomLevel: 1.0,
-  finalPreviewPage: 1
+  finalPreviewPage: 1,
+  undoStack: [],
+  redoStack: []
 };
 
 const pdfEngine = new PDFEngine();
@@ -466,6 +468,13 @@ const dom = {
   btnApplySelectionHighlight: document.getElementById('btn-apply-selection-highlight'),
   quickHighlightPopup: document.getElementById('quick-highlight-popup'),
   btnQuickHlAction: document.getElementById('btn-quick-hl-action'),
+  btnUndo: document.getElementById('btn-undo'),
+  btnRedo: document.getElementById('btn-redo'),
+  btnLoadPcFonts: document.getElementById('btn-load-pc-fonts'),
+  btnToggleCustomFont: document.getElementById('btn-toggle-custom-font'),
+  customFontGroup: document.getElementById('custom-font-group'),
+  customFontInput: document.getElementById('custom-font-input'),
+  btnApplyCustomFont: document.getElementById('btn-apply-custom-font'),
   zoomLevelText: document.getElementById('zoom-level-text'),
   btnZoomIn: document.getElementById('btn-zoom-in'),
   btnZoomOut: document.getElementById('btn-zoom-out'),
@@ -1314,12 +1323,118 @@ async function setupEditSelectView() {
   };
 }
 
+// ==========================================================================
+// History (Undo / Redo) Management
+// ==========================================================================
+function pushHistoryState() {
+  const currentEdits = state.pageEdits[state.currentEditPage] || [];
+  const snapshot = JSON.stringify(currentEdits);
+  if (state.undoStack.length > 0 && JSON.stringify(state.undoStack[state.undoStack.length - 1]) === snapshot) {
+    return;
+  }
+  state.undoStack.push(JSON.parse(snapshot));
+  if (state.undoStack.length > 40) {
+    state.undoStack.shift();
+  }
+  state.redoStack = [];
+  updateHistoryButtons();
+}
+
+function undo() {
+  if (state.undoStack.length === 0) return;
+  const currentEdits = state.pageEdits[state.currentEditPage] || [];
+  state.redoStack.push(JSON.parse(JSON.stringify(currentEdits)));
+
+  const prevEdits = state.undoStack.pop();
+  state.pageEdits[state.currentEditPage] = prevEdits;
+  state.selectedElementId = null;
+
+  renderUserElements();
+  updateLayerList();
+  updateHistoryButtons();
+  showToast('操作を元に戻しました');
+}
+
+function redo() {
+  if (state.redoStack.length === 0) return;
+  const currentEdits = state.pageEdits[state.currentEditPage] || [];
+  state.undoStack.push(JSON.parse(JSON.stringify(currentEdits)));
+
+  const nextEdits = state.redoStack.pop();
+  state.pageEdits[state.currentEditPage] = nextEdits;
+  state.selectedElementId = null;
+
+  renderUserElements();
+  updateLayerList();
+  updateHistoryButtons();
+  showToast('操作をやり直しました');
+}
+
+function updateHistoryButtons() {
+  if (dom.btnUndo) {
+    dom.btnUndo.disabled = state.undoStack.length === 0;
+  }
+  if (dom.btnRedo) {
+    dom.btnRedo.disabled = state.redoStack.length === 0;
+  }
+}
+
+// ==========================================================================
+// Local Font Access API & Custom Font Management
+// ==========================================================================
+async function loadLocalPcFonts() {
+  if (!('queryLocalFonts' in window)) {
+    showToast('お使いのブラウザはフォント一括読込API未対応です。下のカスタム入力をご利用ください', 'info');
+    dom.customFontGroup.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    showToast('PC内のフォントを読み込み中...');
+    const availableFonts = await window.queryLocalFonts();
+    const fontFamilies = Array.from(new Set(availableFonts.map(f => f.family))).sort((a, b) => a.localeCompare(b, 'ja'));
+
+    let localOptgroup = dom.textFontFamily.querySelector('optgroup[data-local="true"]');
+    if (!localOptgroup) {
+      localOptgroup = document.createElement('optgroup');
+      localOptgroup.label = `💻 PCローカルフォント (${fontFamilies.length}種類)`;
+      localOptgroup.dataset.local = 'true';
+      dom.textFontFamily.appendChild(localOptgroup);
+    }
+    localOptgroup.innerHTML = '';
+
+    fontFamilies.forEach(family => {
+      const opt = document.createElement('option');
+      opt.value = `'${family}', sans-serif`;
+      opt.textContent = family;
+      localOptgroup.appendChild(opt);
+    });
+
+    dom.btnLoadPcFonts.innerHTML = `<i data-lucide="check"></i> <span>PCフォント読込完了 (${fontFamilies.length}種)</span>`;
+    dom.btnLoadPcFonts.classList.add('btn-success-subtle');
+    if (window.lucide) window.lucide.createIcons();
+    showToast(`${fontFamilies.length}種類のPCフォントを読み込みました！`, 'success');
+  } catch (err) {
+    console.warn('Font query failed', err);
+    if (err.name === 'NotAllowedError') {
+      showToast('フォントアクセスが拒否されました', 'error');
+    } else {
+      showToast('フォントの取得に失敗しました', 'error');
+    }
+  }
+}
+
 let currentTextItems = [];
 let activeInlineEditor = null;
 
 async function openSinglePageEditor(pageNum) {
   state.currentEditPage = pageNum;
   dom.currentEditPageNum.textContent = pageNum;
+
+  // ページ初期化時に履歴スタックを初期化
+  state.undoStack = [];
+  state.redoStack = [];
+  updateHistoryButtons();
 
   switchView('editPage', `編集 (ページ ${pageNum})`);
 
@@ -1419,6 +1534,10 @@ function applyHighlightToCurrentSelection(customColor = null) {
   const color = customColor || state.activeHighlightColor || '#FFF275';
   const edits = state.pageEdits[state.currentEditPage] || [];
   let addedCount = 0;
+
+  if (clientRects.length > 0) {
+    pushHistoryState();
+  }
 
   clientRects.forEach((r, idx) => {
     if (r.width < 1 || r.height < 1) return;
@@ -1613,6 +1732,10 @@ function createInlineEditor(textItem, targetEdit = null) {
   const commitEdit = () => {
     const val = input.value.trim();
     if (val) {
+      const oldVal = targetEdit ? targetEdit.text : (textItem ? textItem.str : '');
+      if (oldVal !== val) {
+        pushHistoryState();
+      }
       if (targetEdit) {
         targetEdit.text = val;
         dom.activeTextInput.value = val;
@@ -1695,7 +1818,8 @@ function makeRawTextDraggable(box, item) {
         rafId = null;
       }
 
-      if (hasMoved && targetEdit) {
+      if (hasMoved && targetEdit && (currentDx !== 0 || currentDy !== 0)) {
+        pushHistoryState();
         targetEdit.x = Math.max(0, targetEdit.x + currentDx);
         targetEdit.y = Math.max(0, targetEdit.y + currentDy);
         renderUserElements();
@@ -1892,6 +2016,9 @@ function makeElementDraggable(el, edit) {
       el.classList.remove('is-dragging');
       el.style.transform = '';
 
+      if (currentDx !== 0 || currentDy !== 0) {
+        pushHistoryState();
+      }
       edit.x = Math.max(0, origX + currentDx);
       edit.y = Math.max(0, origY + currentDy);
       el.style.left = `${edit.x}px`;
@@ -1928,6 +2055,9 @@ function makeImageResizable(handle, el, edit) {
     };
 
     const onMouseUp = () => {
+      if (edit.width !== startW || edit.height !== startH) {
+        pushHistoryState();
+      }
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
     };
@@ -1986,6 +2116,7 @@ function updateLayerList() {
 }
 
 window.removePageEdit = (id) => {
+  pushHistoryState();
   state.pageEdits[state.currentEditPage] = state.pageEdits[state.currentEditPage].filter(e => e.id !== id);
   if (state.selectedElementId === id) state.selectedElementId = null;
   renderUserElements();
@@ -2021,19 +2152,30 @@ function activateTool(toolName) {
 }
 
 function initEditListeners() {
-  // Global Delete / Backspace key shortcut to remove selected edit element
+  // Global Keyboard Shortcuts (Delete, Undo, Redo)
   window.addEventListener('keydown', (e) => {
+    if (state.currentView !== 'editPage') return;
     const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
     if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
       return;
     }
 
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (state.currentView === 'editPage' && state.selectedElementId) {
+      if (state.selectedElementId) {
         e.preventDefault();
         window.removePageEdit(state.selectedElementId);
         showToast('選択した要素を削除しました');
       }
+    } else if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      if (e.shiftKey) {
+        redo();
+      } else {
+        undo();
+      }
+    } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+      e.preventDefault();
+      redo();
     }
   });
 
@@ -2055,6 +2197,10 @@ function initEditListeners() {
   }
 
   // Text Properties Syncing (Realtime editing)
+  dom.activeTextInput.addEventListener('focus', () => {
+    pushHistoryState();
+  });
+
   dom.activeTextInput.addEventListener('input', (e) => {
     const val = e.target.value;
     const selected = getOrInitSelectedTextEdit();
@@ -2067,6 +2213,7 @@ function initEditListeners() {
 
   // Font Family
   dom.textFontFamily.addEventListener('change', (e) => {
+    pushHistoryState();
     state.activeTextProp.fontFamily = e.target.value;
     const selected = getOrInitSelectedTextEdit();
     if (selected && selected.type === 'text') {
@@ -2077,6 +2224,7 @@ function initEditListeners() {
 
   // Bold Toggle
   dom.btnToggleBold.addEventListener('click', () => {
+    pushHistoryState();
     state.activeTextProp.bold = !state.activeTextProp.bold;
     dom.btnToggleBold.classList.toggle('active', state.activeTextProp.bold);
 
@@ -2089,6 +2237,7 @@ function initEditListeners() {
 
   // Italic Toggle
   dom.btnToggleItalic.addEventListener('click', () => {
+    pushHistoryState();
     state.activeTextProp.italic = !state.activeTextProp.italic;
     dom.btnToggleItalic.classList.toggle('active', state.activeTextProp.italic);
 
@@ -2100,6 +2249,10 @@ function initEditListeners() {
   });
 
   // Font Size Slider
+  dom.textFontSizeRange.addEventListener('change', () => {
+    pushHistoryState();
+  });
+
   dom.textFontSizeRange.addEventListener('input', (e) => {
     const size = parseInt(e.target.value, 10);
     dom.textFontSizeVal.textContent = `${size}px`;
@@ -2115,6 +2268,7 @@ function initEditListeners() {
   // Color Preset Chips for Text
   document.querySelectorAll('.color-chip[data-color]').forEach(chip => {
     chip.addEventListener('click', () => {
+      pushHistoryState();
       document.querySelectorAll('.color-chip[data-color]').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       const color = chip.dataset.color;
@@ -2130,6 +2284,10 @@ function initEditListeners() {
   });
 
   // Custom Color Input
+  dom.textColor.addEventListener('change', () => {
+    pushHistoryState();
+  });
+
   dom.textColor.addEventListener('input', (e) => {
     const color = e.target.value;
     state.activeTextProp.color = color;
@@ -2142,6 +2300,7 @@ function initEditListeners() {
 
   // Background Mask Toggle
   dom.textBgMask.addEventListener('change', (e) => {
+    pushHistoryState();
     const checked = e.target.checked;
     state.activeTextProp.maskBg = checked;
     const selected = getOrInitSelectedTextEdit();
@@ -2150,6 +2309,66 @@ function initEditListeners() {
       renderUserElements();
     }
   });
+
+  // Undo / Redo Click Handlers
+  if (dom.btnUndo) {
+    dom.btnUndo.addEventListener('click', () => {
+      undo();
+    });
+  }
+  if (dom.btnRedo) {
+    dom.btnRedo.addEventListener('click', () => {
+      redo();
+    });
+  }
+
+  // Local PC Fonts Loader
+  if (dom.btnLoadPcFonts) {
+    dom.btnLoadPcFonts.addEventListener('click', loadLocalPcFonts);
+  }
+
+  // Custom Font Name Input Toggle & Apply
+  if (dom.btnToggleCustomFont && dom.customFontGroup) {
+    dom.btnToggleCustomFont.addEventListener('click', () => {
+      dom.customFontGroup.classList.toggle('hidden');
+      if (!dom.customFontGroup.classList.contains('hidden') && dom.customFontInput) {
+        dom.customFontInput.focus();
+      }
+    });
+  }
+
+  if (dom.btnApplyCustomFont && dom.customFontInput) {
+    dom.btnApplyCustomFont.addEventListener('click', () => {
+      const customName = dom.customFontInput.value.trim();
+      if (!customName) {
+        showToast('フォント名を入力してください', 'error');
+        return;
+      }
+
+      let customOptgroup = dom.textFontFamily.querySelector('optgroup[data-custom="true"]');
+      if (!customOptgroup) {
+        customOptgroup = document.createElement('optgroup');
+        customOptgroup.label = '✏️ 手動指定フォント';
+        customOptgroup.dataset.custom = 'true';
+        dom.textFontFamily.insertBefore(customOptgroup, dom.textFontFamily.firstChild);
+      }
+
+      const opt = document.createElement('option');
+      opt.value = `'${customName}', sans-serif`;
+      opt.textContent = customName;
+      opt.selected = true;
+      customOptgroup.appendChild(opt);
+
+      state.activeTextProp.fontFamily = opt.value;
+      const selected = getOrInitSelectedTextEdit();
+      if (selected && selected.type === 'text') {
+        pushHistoryState();
+        selected.fontFamily = opt.value;
+        renderUserElements();
+      }
+      showToast(`フォント「${customName}」を適用しました`, 'success');
+    });
+  }
 
   // Highlight Button (サイドバー「選択した文字をハイライト」ボタン)
   if (dom.btnApplySelectionHighlight) {
@@ -2240,6 +2459,7 @@ function initEditListeners() {
           canvasWidth: dom.pdfRenderCanvas.width,
           canvasHeight: dom.pdfRenderCanvas.height
         };
+        pushHistoryState();
         state.pageEdits[state.currentEditPage].push(newImg);
         state.selectedElementId = newImg.id;
         renderUserElements();
@@ -2312,6 +2532,7 @@ function initEditListeners() {
     if (w < 6 || h < 6) return; // Ignore accidental micro-clicks
 
     if (state.activeTool === 'redact') {
+      pushHistoryState();
       const isWhite = dom.redactColor.value === '#FFFFFF';
       const newRedact = {
         id: `redact-${Date.now()}`,

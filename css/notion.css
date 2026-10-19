@@ -1608,3 +1608,57 @@ body {
   background-color: var(--notion-hover);
   border-color: var(--notion-text);
 }
+
+/* History Controls (Undo / Redo) */
+.history-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.history-controls .btn-notion {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  color: var(--notion-text);
+  border: 1px solid var(--notion-border);
+  background-color: var(--notion-card-bg);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+.history-controls .btn-notion:hover:not(:disabled) {
+  background-color: var(--notion-hover);
+  border-color: var(--notion-text-muted);
+}
+.history-controls .btn-notion:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+/* Font Loading & Custom Input */
+.label-with-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.btn-text-link {
+  background: none;
+  border: none;
+  color: var(--notion-blue);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+.btn-text-link:hover {
+  color: #1c6ec0;
+}
+.btn-success-subtle {
+  background-color: rgba(39, 174, 96, 0.1) !important;
+  color: #27AE60 !important;
+  border-color: rgba(39, 174, 96, 0.3) !important;
+}
