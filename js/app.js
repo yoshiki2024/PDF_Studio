@@ -449,6 +449,12 @@ const dom = {
   panelImageOptions: document.getElementById('panel-image-options'),
   activeTextInput: document.getElementById('active-text-input'),
   textFontFamily: document.getElementById('text-font-family'),
+  fontComboboxContainer: document.getElementById('font-combobox-container'),
+  fontComboboxInput: document.getElementById('font-combobox-input'),
+  btnFontComboboxToggle: document.getElementById('btn-font-combobox-toggle'),
+  fontSuggestDropdown: document.getElementById('font-suggest-dropdown'),
+  fontSuggestList: document.getElementById('font-suggest-list'),
+  fontCountBadge: document.getElementById('font-count-badge'),
   textFontSizeRange: document.getElementById('text-font-size-range'),
   textFontSizeVal: document.getElementById('text-font-size-val'),
   btnToggleBold: document.getElementById('btn-toggle-bold'),
@@ -471,10 +477,6 @@ const dom = {
   btnUndo: document.getElementById('btn-undo'),
   btnRedo: document.getElementById('btn-redo'),
   btnLoadPcFonts: document.getElementById('btn-load-pc-fonts'),
-  btnToggleCustomFont: document.getElementById('btn-toggle-custom-font'),
-  customFontGroup: document.getElementById('custom-font-group'),
-  customFontInput: document.getElementById('custom-font-input'),
-  btnApplyCustomFont: document.getElementById('btn-apply-custom-font'),
   zoomLevelText: document.getElementById('zoom-level-text'),
   btnZoomIn: document.getElementById('btn-zoom-in'),
   btnZoomOut: document.getElementById('btn-zoom-out'),
@@ -1380,12 +1382,178 @@ function updateHistoryButtons() {
 }
 
 // ==========================================================================
-// Local Font Access API & Custom Font Management
+// Font Master & Incremental Search Combobox
 // ==========================================================================
+const DEFAULT_FONT_LIST = [
+  // 定番・ゴシック
+  { name: 'Noto Sans JP (標準ゴシック)', value: "'Noto Sans JP', sans-serif", group: '定番・ゴシック体', keywords: ['noto', 'のとお', '標準', 'ゴシック'] },
+  { name: '游ゴシック (Yu Gothic)', value: "'Yu Gothic', '游ゴシック', sans-serif", group: '定番・ゴシック体', keywords: ['yu', 'yugothic', 'ゆうごしっく', '游ゴシック'] },
+  { name: 'メイリオ (Meiryo)', value: "'Meiryo', 'メイリオ', sans-serif", group: '定番・ゴシック体', keywords: ['meiryo', 'めいりお', 'メイリオ'] },
+  { name: 'ＭＳ Ｐゴシック', value: "'MS PGothic', 'ＭＳ Ｐゴシック', sans-serif", group: '定番・ゴシック体', keywords: ['ms', 'mspgothic', 'えむえす', 'MSゴシック'] },
+  { name: 'BIZ UDPゴシック (ユニバーサル)', value: "'BIZ UDPGothic', 'BIZ UDPゴシック', sans-serif", group: '定番・ゴシック体', keywords: ['biz', 'udp', 'ユニバーサル'] },
+  { name: 'ヒラギノ角ゴ (Mac標準)', value: "'Hiragino Sans', 'ヒラギノ角ゴ', sans-serif", group: '定番・ゴシック体', keywords: ['hiragino', 'ひらぎの', 'mac'] },
+
+  // 明朝体
+  { name: 'Noto Serif JP (明朝体)', value: "'Noto Serif JP', serif", group: '明朝体 (フォーマル・書類)', keywords: ['noto', 'serif', 'みんちょう', '明朝'] },
+  { name: '游明朝 (Yu Mincho)', value: "'Yu Mincho', '游明朝', serif", group: '明朝体 (フォーマル・書類)', keywords: ['yu', 'mincho', 'ゆうみんちょう', '游明朝'] },
+  { name: 'ＭＳ Ｐ明朝', value: "'MS PMincho', 'ＭＳ Ｐ明朝', serif", group: '明朝体 (フォーマル・書類)', keywords: ['ms', 'mincho', 'えむえす', 'MS明朝'] },
+  { name: 'BIZ UDP明朝', value: "'BIZ UDPMincho', 'BIZ UDP明朝', serif", group: '明朝体 (フォーマル・書類)', keywords: ['biz', 'udp', '明朝'] },
+
+  // 等幅・数字
+  { name: 'Roboto Mono (等幅英数)', value: "'Roboto Mono', monospace", group: '等幅・数字・コード', keywords: ['roboto', 'mono', 'とうはば', '等幅'] },
+  { name: 'ＭＳ ゴシック (等幅)', value: "'MS Gothic', 'ＭＳ ゴシック', monospace", group: '等幅・数字・コード', keywords: ['ms', 'gothic', '等幅'] },
+  { name: 'Consolas', value: "'Consolas', monospace", group: '等幅・数字・コード', keywords: ['consolas', 'code', '等幅'] },
+  { name: 'Courier New', value: "'Courier New', monospace", group: '等幅・数字・コード', keywords: ['courier', '等幅'] },
+
+  // 欧文
+  { name: 'Inter (モダンサンセリフ)', value: "'Inter', sans-serif", group: '欧文フォント', keywords: ['inter', 'モダン'] },
+  { name: 'Arial', value: "'Arial', sans-serif", group: '欧文フォント', keywords: ['arial', 'アリアル'] },
+  { name: 'Helvetica', value: "'Helvetica', sans-serif", group: '欧文フォント', keywords: ['helvetica', 'ヘルベチカ'] },
+  { name: 'Times New Roman', value: "'Times New Roman', serif", group: '欧文フォント', keywords: ['times', 'new roman', 'タイムズ'] },
+  { name: 'Georgia', value: "'Georgia', serif", group: '欧文フォント', keywords: ['georgia', 'ジョージア'] }
+];
+
+let fontMasterList = [...DEFAULT_FONT_LIST];
+let highlightedSuggestIndex = -1;
+let currentFilteredFonts = [];
+
+function renderFontSuggestions(filterQuery = '') {
+  const listEl = dom.fontSuggestList;
+  if (!listEl) return;
+  listEl.innerHTML = '';
+
+  const q = filterQuery.trim().toLowerCase();
+  
+  if (!q) {
+    currentFilteredFonts = [...fontMasterList];
+  } else {
+    currentFilteredFonts = fontMasterList.filter(f => {
+      const matchName = f.name.toLowerCase().includes(q);
+      const matchVal = f.value.toLowerCase().includes(q);
+      const matchGrp = (f.group || '').toLowerCase().includes(q);
+      const matchKeywords = f.keywords ? f.keywords.some(k => k.toLowerCase().includes(q)) : false;
+      return matchName || matchVal || matchGrp || matchKeywords;
+    });
+  }
+
+  const groups = {};
+  currentFilteredFonts.forEach(font => {
+    const grp = font.group || 'その他のフォント';
+    if (!groups[grp]) groups[grp] = [];
+    groups[grp].push(font);
+  });
+
+  let globalIndex = 0;
+  Object.keys(groups).forEach(grpTitle => {
+    const header = document.createElement('div');
+    header.className = 'font-suggest-group-header';
+    header.textContent = grpTitle;
+    listEl.appendChild(header);
+
+    groups[grpTitle].forEach(font => {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'font-suggest-item';
+      if (state.activeTextProp.fontFamily === font.value) {
+        itemEl.classList.add('active');
+      }
+      itemEl.dataset.index = globalIndex;
+      itemEl.dataset.fontValue = font.value;
+      itemEl.dataset.fontName = font.name;
+
+      itemEl.innerHTML = `
+        <div class="font-name-wrap">
+          <span style="font-family: ${font.value};">${font.name}</span>
+        </div>
+        <span class="font-preview-sample" style="font-family: ${font.value};">あA1</span>
+      `;
+
+      itemEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        applyFontSelection(font.value, font.name);
+        closeFontSuggest();
+      });
+
+      listEl.appendChild(itemEl);
+      globalIndex++;
+    });
+  });
+
+  // もし絞り込み文字があり、既存の候補名と完全一致しない場合は「手動フォントとして適用」を表示
+  if (q && !fontMasterList.some(f => f.name.toLowerCase() === q || f.name.split(' ')[0].toLowerCase() === q)) {
+    const customOption = document.createElement('div');
+    customOption.className = 'font-suggest-item font-custom-item';
+    customOption.innerHTML = `
+      <div class="font-name-wrap">
+        <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+        <span>「<strong>${filterQuery.trim()}</strong>」を手動フォント名として適用</span>
+      </div>
+    `;
+    customOption.addEventListener('click', (e) => {
+      e.stopPropagation();
+      applyFontSelection(`'${filterQuery.trim()}', sans-serif`, filterQuery.trim());
+      closeFontSuggest();
+    });
+    listEl.appendChild(customOption);
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  highlightedSuggestIndex = -1;
+}
+
+function openFontSuggest() {
+  if (dom.fontSuggestDropdown) {
+    dom.fontSuggestDropdown.classList.remove('hidden');
+    dom.fontComboboxContainer?.classList.add('open');
+  }
+}
+
+function closeFontSuggest() {
+  if (dom.fontSuggestDropdown) {
+    dom.fontSuggestDropdown.classList.add('hidden');
+    dom.fontComboboxContainer?.classList.remove('open');
+    highlightedSuggestIndex = -1;
+  }
+}
+
+function getFontDisplayName(fontValue) {
+  if (!fontValue) return 'Noto Sans JP (標準ゴシック)';
+  const found = fontMasterList.find(f => f.value === fontValue);
+  if (found) return found.name;
+  return fontValue.replace(/['"]/g, '').split(',')[0].trim();
+}
+
+function applyFontSelection(fontValue, displayName) {
+  state.activeTextProp.fontFamily = fontValue;
+  if (dom.fontComboboxInput) {
+    dom.fontComboboxInput.value = displayName;
+  }
+  if (dom.textFontFamily) {
+    let existingOpt = Array.from(dom.textFontFamily.options).find(o => o.value === fontValue);
+    if (!existingOpt) {
+      existingOpt = document.createElement('option');
+      existingOpt.value = fontValue;
+      existingOpt.textContent = displayName;
+      dom.textFontFamily.appendChild(existingOpt);
+    }
+    dom.textFontFamily.value = fontValue;
+  }
+
+  let selected = (state.pageEdits[state.currentEditPage] || []).find(el => el.id === state.selectedElementId);
+  if (!selected && state.selectedTextItem) {
+    selected = ensureTextEditElement(state.selectedTextItem);
+    state.selectedElementId = selected.id;
+  }
+  if (selected && selected.type === 'text') {
+    pushHistoryState();
+    selected.fontFamily = fontValue;
+    renderUserElements();
+  }
+  showToast(`フォント「${displayName}」を適用しました`, 'success');
+}
+
 async function loadLocalPcFonts() {
   if (!('queryLocalFonts' in window)) {
-    showToast('お使いのブラウザはフォント一括読込API未対応です。下のカスタム入力をご利用ください', 'info');
-    dom.customFontGroup.classList.remove('hidden');
+    showToast('お使いのブラウザはフォント一括読込API未対応です。フォント名を入力して直接ご指定ください', 'info');
     return;
   }
 
@@ -1394,26 +1562,30 @@ async function loadLocalPcFonts() {
     const availableFonts = await window.queryLocalFonts();
     const fontFamilies = Array.from(new Set(availableFonts.map(f => f.family))).sort((a, b) => a.localeCompare(b, 'ja'));
 
-    let localOptgroup = dom.textFontFamily.querySelector('optgroup[data-local="true"]');
-    if (!localOptgroup) {
-      localOptgroup = document.createElement('optgroup');
-      localOptgroup.label = `💻 PCローカルフォント (${fontFamilies.length}種類)`;
-      localOptgroup.dataset.local = 'true';
-      dom.textFontFamily.appendChild(localOptgroup);
-    }
-    localOptgroup.innerHTML = '';
-
+    let addedCount = 0;
     fontFamilies.forEach(family => {
-      const opt = document.createElement('option');
-      opt.value = `'${family}', sans-serif`;
-      opt.textContent = family;
-      localOptgroup.appendChild(opt);
+      if (!fontMasterList.some(f => f.name === family)) {
+        fontMasterList.push({
+          name: family,
+          value: `'${family}', sans-serif`,
+          group: '💻 PCローカルフォント',
+          keywords: [family.toLowerCase()]
+        });
+        addedCount++;
+      }
     });
+
+    if (dom.fontCountBadge) {
+      dom.fontCountBadge.textContent = `${fontMasterList.length}種利用可`;
+    }
 
     dom.btnLoadPcFonts.innerHTML = `<i data-lucide="check"></i> <span>PCフォント読込完了 (${fontFamilies.length}種)</span>`;
     dom.btnLoadPcFonts.classList.add('btn-success-subtle');
     if (window.lucide) window.lucide.createIcons();
-    showToast(`${fontFamilies.length}種類のPCフォントを読み込みました！`, 'success');
+    showToast(`${fontFamilies.length}種類のPCフォントを読み込みました！入力欄から検索できます。`, 'success');
+
+    // 候補リストを更新
+    renderFontSuggestions(dom.fontComboboxInput ? dom.fontComboboxInput.value : '');
   } catch (err) {
     console.warn('Font query failed', err);
     if (err.name === 'NotAllowedError') {
@@ -1435,6 +1607,10 @@ async function openSinglePageEditor(pageNum) {
   state.undoStack = [];
   state.redoStack = [];
   updateHistoryButtons();
+
+  if (dom.fontComboboxInput) {
+    dom.fontComboboxInput.value = getFontDisplayName(state.activeTextProp.fontFamily);
+  }
 
   switchView('editPage', `編集 (ページ ${pageNum})`);
 
@@ -1639,6 +1815,7 @@ function ensureTextEditElement(item) {
       origY: item.y,
       origWidth: item.width,
       origHeight: item.height,
+      origText: item.str,
       width: Math.max(item.width, 30),
       height: Math.max(item.height, 16),
       text: item.str,
@@ -1685,6 +1862,9 @@ function selectAndEditText(textItem, boxElement) {
     dom.textFontSizeVal.textContent = `${existing.fontSize || calculatedFontSize}px`;
     dom.btnToggleBold.classList.toggle('active', !!existing.bold);
     dom.btnToggleItalic.classList.toggle('active', !!existing.italic);
+    if (dom.fontComboboxInput && existing.fontFamily) {
+      dom.fontComboboxInput.value = getFontDisplayName(existing.fontFamily);
+    }
   } else {
     // クリックしただけでは編集要素を追加せず、サイドバーに入力情報を同期するのみ
     state.selectedElementId = null;
@@ -1693,6 +1873,9 @@ function selectAndEditText(textItem, boxElement) {
     dom.textFontSizeVal.textContent = `${calculatedFontSize}px`;
     dom.btnToggleBold.classList.remove('active');
     dom.btnToggleItalic.classList.remove('active');
+    if (dom.fontComboboxInput) {
+      dom.fontComboboxInput.value = getFontDisplayName(state.activeTextProp.fontFamily);
+    }
   }
 
   renderUserElements();
@@ -1781,6 +1964,8 @@ function makeRawTextDraggable(box, item) {
     isDragging = true;
     targetEdit = null;
 
+    let beforeDragEdits = JSON.parse(JSON.stringify(state.pageEdits[state.currentEditPage] || []));
+
     const onMouseMove = (ev) => {
       if (!isDragging) return;
       const dx = ev.clientX - startX;
@@ -1819,9 +2004,21 @@ function makeRawTextDraggable(box, item) {
       }
 
       if (hasMoved && targetEdit && (currentDx !== 0 || currentDy !== 0)) {
-        pushHistoryState();
+        // ドラッグ前のクリーンな状態（targetEdit作成前）をUndoスタックに保存！
+        if (state.undoStack.length === 0 || JSON.stringify(state.undoStack[state.undoStack.length - 1]) !== JSON.stringify(beforeDragEdits)) {
+          state.undoStack.push(beforeDragEdits);
+          if (state.undoStack.length > 40) state.undoStack.shift();
+          state.redoStack = [];
+          updateHistoryButtons();
+        }
         targetEdit.x = Math.max(0, targetEdit.x + currentDx);
         targetEdit.y = Math.max(0, targetEdit.y + currentDy);
+        renderUserElements();
+        updateLayerList();
+      } else if (targetEdit && currentDx === 0 && currentDy === 0) {
+        // 動かさなかった場合は自動生成されたゴミ要素を除去して文字ダブりを完全防護
+        state.pageEdits[state.currentEditPage] = state.pageEdits[state.currentEditPage].filter(el => el.id !== targetEdit.id);
+        if (state.selectedElementId === targetEdit.id) state.selectedElementId = null;
         renderUserElements();
         updateLayerList();
       }
@@ -1835,22 +2032,46 @@ function makeRawTextDraggable(box, item) {
   });
 }
 
+function cleanupPristineEdits() {
+  const currentEdits = state.pageEdits[state.currentEditPage];
+  if (!currentEdits || currentEdits.length === 0) return;
+
+  state.pageEdits[state.currentEditPage] = currentEdits.filter(edit => {
+    if (edit.type === 'text' && edit.origX !== undefined) {
+      const isSamePos = Math.abs(edit.x - edit.origX) <= 2 && Math.abs(edit.y - edit.origY) <= 2;
+      const isSameText = edit.origText !== undefined ? edit.text === edit.origText : false;
+      const isDefaultStyle = !edit.bold && !edit.italic && (!edit.color || edit.color === '#000000');
+      // 位置も文字もスタイルも元のままなら、文字ダブりを防止するために自動除去
+      if (isSamePos && isSameText && isDefaultStyle) {
+        if (state.selectedElementId === edit.id) state.selectedElementId = null;
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
 function renderUserElements() {
+  cleanupPristineEdits();
   const container = dom.userElementsLayer;
   container.innerHTML = '';
 
   const edits = state.pageEdits[state.currentEditPage] || [];
 
-  // 移動されたテキストの「元位置の白塗りマスク」を先に描画（二重表示の防止）
+  // 移動または変更されたテキストの「元位置の白塗りマスク」を先に描画（文字ダブりの完全防止！）
   edits.forEach((edit) => {
-    if (edit.type === 'text' && edit.origX !== undefined && (Math.abs(edit.x - edit.origX) > 2 || Math.abs(edit.y - edit.origY) > 2)) {
-      const origMask = document.createElement('div');
-      origMask.className = 'user-orig-mask';
-      origMask.style.left = `${edit.origX - 1}px`;
-      origMask.style.top = `${edit.origY - 1}px`;
-      origMask.style.width = `${edit.origWidth + 2}px`;
-      origMask.style.height = `${edit.origHeight + 2}px`;
-      container.appendChild(origMask);
+    if (edit.type === 'text' && edit.origX !== undefined) {
+      const isMoved = Math.abs(edit.x - edit.origX) > 2 || Math.abs(edit.y - edit.origY) > 2;
+      const isTextChanged = edit.origText !== undefined && edit.text !== edit.origText;
+      if (isMoved || isTextChanged || edit.maskBg) {
+        const origMask = document.createElement('div');
+        origMask.className = 'user-orig-mask';
+        origMask.style.left = `${edit.origX - 1}px`;
+        origMask.style.top = `${edit.origY - 1}px`;
+        origMask.style.width = `${edit.origWidth + 2}px`;
+        origMask.style.height = `${edit.origHeight + 2}px`;
+        container.appendChild(origMask);
+      }
     }
   });
 
@@ -1881,6 +2102,9 @@ function renderUserElements() {
         dom.textFontSizeVal.textContent = `${edit.fontSize || 14}px`;
         dom.btnToggleBold.classList.toggle('active', !!edit.bold);
         dom.btnToggleItalic.classList.toggle('active', !!edit.italic);
+        if (dom.fontComboboxInput && edit.fontFamily) {
+          dom.fontComboboxInput.value = getFontDisplayName(edit.fontFamily);
+        }
         document.querySelectorAll('.user-el').forEach(elem => elem.classList.remove('selected'));
         el.classList.add('selected');
         updateLayerList();
@@ -1969,12 +2193,15 @@ function makeElementDraggable(el, edit) {
     currentDx = 0;
     currentDy = 0;
 
+    let beforeDragEdits = JSON.parse(JSON.stringify(state.pageEdits[state.currentEditPage] || []));
+
     // テキスト要素で元位置情報が未保存の場合は保存
     if (edit.type === 'text' && edit.origX === undefined) {
       edit.origX = edit.x;
       edit.origY = edit.y;
       edit.origWidth = edit.width || 30;
       edit.origHeight = edit.height || 16;
+      edit.origText = edit.text;
     }
 
     // Fast selection without destroying DOM
@@ -2017,7 +2244,12 @@ function makeElementDraggable(el, edit) {
       el.style.transform = '';
 
       if (currentDx !== 0 || currentDy !== 0) {
-        pushHistoryState();
+        if (state.undoStack.length === 0 || JSON.stringify(state.undoStack[state.undoStack.length - 1]) !== JSON.stringify(beforeDragEdits)) {
+          state.undoStack.push(beforeDragEdits);
+          if (state.undoStack.length > 40) state.undoStack.shift();
+          state.redoStack = [];
+          updateHistoryButtons();
+        }
       }
       edit.x = Math.max(0, origX + currentDx);
       edit.y = Math.max(0, origY + currentDy);
@@ -2327,48 +2559,78 @@ function initEditListeners() {
     dom.btnLoadPcFonts.addEventListener('click', loadLocalPcFonts);
   }
 
-  // Custom Font Name Input Toggle & Apply
-  if (dom.btnToggleCustomFont && dom.customFontGroup) {
-    dom.btnToggleCustomFont.addEventListener('click', () => {
-      dom.customFontGroup.classList.toggle('hidden');
-      if (!dom.customFontGroup.classList.contains('hidden') && dom.customFontInput) {
-        dom.customFontInput.focus();
+  // Searchable Font Combobox Listeners
+  if (dom.fontComboboxInput) {
+    dom.fontComboboxInput.addEventListener('focus', () => {
+      renderFontSuggestions(dom.fontComboboxInput.value);
+      openFontSuggest();
+    });
+
+    dom.fontComboboxInput.addEventListener('input', (e) => {
+      renderFontSuggestions(e.target.value);
+      openFontSuggest();
+    });
+
+    dom.fontComboboxInput.addEventListener('keydown', (e) => {
+      const items = dom.fontSuggestList ? dom.fontSuggestList.querySelectorAll('.font-suggest-item') : [];
+      if (items.length === 0) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        openFontSuggest();
+        highlightedSuggestIndex = Math.min(highlightedSuggestIndex + 1, items.length - 1);
+        items.forEach((it, idx) => it.classList.toggle('highlighted', idx === highlightedSuggestIndex));
+        if (items[highlightedSuggestIndex]) {
+          items[highlightedSuggestIndex].scrollIntoView({ block: 'nearest' });
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        openFontSuggest();
+        highlightedSuggestIndex = Math.max(highlightedSuggestIndex - 1, 0);
+        items.forEach((it, idx) => it.classList.toggle('highlighted', idx === highlightedSuggestIndex));
+        if (items[highlightedSuggestIndex]) {
+          items[highlightedSuggestIndex].scrollIntoView({ block: 'nearest' });
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (highlightedSuggestIndex >= 0 && items[highlightedSuggestIndex]) {
+          items[highlightedSuggestIndex].click();
+        } else {
+          const val = dom.fontComboboxInput.value.trim();
+          if (val) {
+            const matched = fontMasterList.find(f => f.name.toLowerCase() === val.toLowerCase());
+            if (matched) {
+              applyFontSelection(matched.value, matched.name);
+            } else {
+              applyFontSelection(`'${val}', sans-serif`, val);
+            }
+            closeFontSuggest();
+          }
+        }
+      } else if (e.key === 'Escape') {
+        closeFontSuggest();
       }
     });
   }
 
-  if (dom.btnApplyCustomFont && dom.customFontInput) {
-    dom.btnApplyCustomFont.addEventListener('click', () => {
-      const customName = dom.customFontInput.value.trim();
-      if (!customName) {
-        showToast('フォント名を入力してください', 'error');
-        return;
+  if (dom.btnFontComboboxToggle) {
+    dom.btnFontComboboxToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (dom.fontSuggestDropdown && dom.fontSuggestDropdown.classList.contains('hidden')) {
+        renderFontSuggestions('');
+        openFontSuggest();
+        dom.fontComboboxInput.focus();
+      } else {
+        closeFontSuggest();
       }
-
-      let customOptgroup = dom.textFontFamily.querySelector('optgroup[data-custom="true"]');
-      if (!customOptgroup) {
-        customOptgroup = document.createElement('optgroup');
-        customOptgroup.label = '✏️ 手動指定フォント';
-        customOptgroup.dataset.custom = 'true';
-        dom.textFontFamily.insertBefore(customOptgroup, dom.textFontFamily.firstChild);
-      }
-
-      const opt = document.createElement('option');
-      opt.value = `'${customName}', sans-serif`;
-      opt.textContent = customName;
-      opt.selected = true;
-      customOptgroup.appendChild(opt);
-
-      state.activeTextProp.fontFamily = opt.value;
-      const selected = getOrInitSelectedTextEdit();
-      if (selected && selected.type === 'text') {
-        pushHistoryState();
-        selected.fontFamily = opt.value;
-        renderUserElements();
-      }
-      showToast(`フォント「${customName}」を適用しました`, 'success');
     });
   }
+
+  document.addEventListener('click', (e) => {
+    if (dom.fontComboboxContainer && !dom.fontComboboxContainer.contains(e.target)) {
+      closeFontSuggest();
+    }
+  });
 
   // Highlight Button (サイドバー「選択した文字をハイライト」ボタン)
   if (dom.btnApplySelectionHighlight) {

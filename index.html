@@ -411,37 +411,30 @@
 
               <div class="prop-group">
                 <div class="label-with-action">
-                  <label for="text-font-family">フォント:</label>
-                  <button type="button" class="btn-text-link" id="btn-toggle-custom-font" title="フォント名を手動入力">手動入力</button>
+                  <label for="font-combobox-input">フォント (検索・手動入力):</label>
+                  <span class="text-xs text-muted" id="font-count-badge">定番フォント</span>
                 </div>
-                <select id="text-font-family" class="notion-select">
-                  <optgroup label="定番・ゴシック体">
-                    <option value="'Noto Sans JP', sans-serif">Noto Sans JP (標準ゴシック)</option>
-                    <option value="'Yu Gothic', '游ゴシック', sans-serif">游ゴシック (Yu Gothic)</option>
-                    <option value="'Meiryo', 'メイリオ', sans-serif">メイリオ (Meiryo)</option>
-                    <option value="'MS PGothic', 'ＭＳ Ｐゴシック', sans-serif">ＭＳ Ｐゴシック</option>
-                    <option value="'BIZ UDPGothic', 'BIZ UDPゴシック', sans-serif">BIZ UDPゴシック (ユニバーサル)</option>
-                    <option value="'Hiragino Sans', 'ヒラギノ角ゴ', sans-serif">ヒラギノ角ゴ (Mac標準)</option>
-                  </optgroup>
-                  <optgroup label="明朝体 (フォーマル・書類)">
-                    <option value="'Noto Serif JP', serif">Noto Serif JP (明朝体)</option>
-                    <option value="'Yu Mincho', '游明朝', serif">游明朝 (Yu Mincho)</option>
-                    <option value="'MS PMincho', 'ＭＳ Ｐ明朝', serif">ＭＳ Ｐ明朝</option>
-                    <option value="'BIZ UDPMincho', 'BIZ UDP明朝', serif">BIZ UDP明朝</option>
-                  </optgroup>
-                  <optgroup label="等幅・数字・コード">
-                    <option value="'Roboto Mono', monospace">Roboto Mono (等幅英数)</option>
-                    <option value="'MS Gothic', 'ＭＳ ゴシック', monospace">ＭＳ ゴシック (等幅)</option>
-                    <option value="'Consolas', monospace">Consolas</option>
-                    <option value="'Courier New', monospace">Courier New</option>
-                  </optgroup>
-                  <optgroup label="欧文フォント">
-                    <option value="'Inter', sans-serif">Inter (モダンサンセリフ)</option>
-                    <option value="'Arial', sans-serif">Arial</option>
-                    <option value="'Helvetica', sans-serif">Helvetica</option>
-                    <option value="'Times New Roman', serif">Times New Roman</option>
-                    <option value="'Georgia', serif">Georgia</option>
-                  </optgroup>
+                
+                <!-- インクリメンタルサーチ対応 コンボボックス -->
+                <div class="font-combobox-container" id="font-combobox-container">
+                  <div class="font-combobox-input-wrap">
+                    <input type="text" id="font-combobox-input" class="notion-input font-combobox-input" placeholder="フォント名を入力・検索..." value="Noto Sans JP (標準ゴシック)" autocomplete="off">
+                    <button type="button" id="btn-font-combobox-toggle" class="combobox-arrow-btn" title="フォント一覧を表示">
+                      <i data-lucide="chevron-down"></i>
+                    </button>
+                  </div>
+                  
+                  <!-- サジェスト候補ドロップダウン -->
+                  <div id="font-suggest-dropdown" class="font-suggest-dropdown hidden">
+                    <div id="font-suggest-list" class="font-suggest-list">
+                      <!-- 動的候補リスト -->
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 内部値同期用セレクト（PDF書き出しエンジンとの互換性保持） -->
+                <select id="text-font-family" class="hidden">
+                  <option value="'Noto Sans JP', sans-serif" selected>Noto Sans JP (標準ゴシック)</option>
                 </select>
 
                 <!-- PCローカルフォント一括読み込みボタン -->
@@ -449,12 +442,6 @@
                   <i data-lucide="laptop"></i>
                   <span>PC内の全フォントを読み込む</span>
                 </button>
-
-                <!-- 手動カスタムフォント名入力（非表示トグル） -->
-                <div id="custom-font-group" class="custom-font-input-wrapper hidden" style="margin-top: 6px;">
-                  <input type="text" id="custom-font-input" class="notion-input" style="font-size: 12px;" placeholder="フォント名を入力 (例: HGP創英角ﾎﾟｯﾌﾟ体)">
-                  <button type="button" id="btn-apply-custom-font" class="btn-notion btn-secondary btn-sm w-full" style="margin-top: 4px; font-size: 11px; justify-content: center;">フォント名を適用</button>
-                </div>
               </div>
 
               <!-- Style Buttons: Bold, Italic, Color -->
