@@ -32,6 +32,7 @@ export class PDFEngine {
       file,
       name: file.name,
       size: file.size,
+      lastModified: file.lastModified || Date.now(),
       pageCount: pdfJsDoc.numPages,
       pdfJsDoc,
       pdfLibDoc,

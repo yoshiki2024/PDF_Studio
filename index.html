@@ -228,10 +228,39 @@
           </div>
         </div>
 
+        <!-- Merge Sort Control Bar (ワンクリック並び替えバー) -->
+        <div class="merge-sort-card">
+          <div class="sort-group-left">
+            <span class="sort-title"><i data-lucide="arrow-up-down"></i> ワンクリック並び替え:</span>
+            <span class="sort-target-badge" id="sort-target-badge">全ファイルを対象</span>
+          </div>
+          <div class="sort-btn-clusters">
+            <!-- 日付で並び替え -->
+            <div class="btn-sort-cluster" title="更新日時で並び替え">
+              <button type="button" class="btn-sort" id="btn-sort-date-asc" title="更新日時が古い順（過去 → 最新）">
+                <i data-lucide="calendar"></i> 日付 昇順 (古い順)
+              </button>
+              <button type="button" class="btn-sort" id="btn-sort-date-desc" title="更新日時が新しい順（最新 → 過去）">
+                <i data-lucide="calendar"></i> 日付 降順 (新しい順)
+              </button>
+            </div>
+
+            <!-- 名前で並び替え -->
+            <div class="btn-sort-cluster" title="ファイル名で並び替え">
+              <button type="button" class="btn-sort" id="btn-sort-name-asc" title="ファイル名昇順（五十音・A→Z）">
+                <i data-lucide="arrow-down-a-z"></i> 名前 昇順 (A→Z)
+              </button>
+              <button type="button" class="btn-sort" id="btn-sort-name-desc" title="ファイル名降順（Z→A）">
+                <i data-lucide="arrow-up-z-a"></i> 名前 降順 (Z→A)
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div class="notion-callout mb-4">
           <div class="callout-icon">💡</div>
           <div class="callout-text">
-            <strong>ヒント:</strong> チェックボックスを複数チェックするか、<code>Shift</code>キーを押しながらクリックすると複数ブロックを選択でき、そのまままとめて別の位置へドラッグ＆ドロップ移動できます。
+            <strong>ヒント:</strong> チェックボックスで特定のPDFを選択すると、<strong>選択したファイル同士だけを並び替え</strong>できます（未選択の場合は全ファイルが並び替わります）。またドラッグ＆ドロップで任意の位置への手動移動も可能です。
           </div>
         </div>
 

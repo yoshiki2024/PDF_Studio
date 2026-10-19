@@ -200,6 +200,7 @@ class PDFEngine {
       file,
       name: file.name,
       size: file.size,
+      lastModified: file.lastModified || Date.now(),
       pageCount: pdfJsDoc.numPages,
       pdfJsDoc,
       pdfLibDoc,
@@ -766,6 +767,11 @@ const dom = {
   btnMergeAddMore: document.getElementById('btn-merge-add-more'),
   mergeAddInput: document.getElementById('merge-add-input'),
   btnSelectAllMerge: document.getElementById('btn-select-all-merge'),
+  sortTargetBadge: document.getElementById('sort-target-badge'),
+  btnSortDateAsc: document.getElementById('btn-sort-date-asc'),
+  btnSortDateDesc: document.getElementById('btn-sort-date-desc'),
+  btnSortNameAsc: document.getElementById('btn-sort-name-asc'),
+  btnSortNameDesc: document.getElementById('btn-sort-name-desc'),
 
   // Split
   splitGridContainer: document.getElementById('split-grid-container'),
@@ -1174,8 +1180,39 @@ function navigateToMode(mode) {
 }
 
 // ==========================================================================
-// Mode ②: Merge (PDF結合 & D&D並び替え & 複数ブロック移動)
+// Mode ②: Merge (PDF結合 & D&D並び替え & 日付・名前ソート & 複数選択並び替え)
 // ==========================================================================
+
+function formatDateTime(timestamp) {
+  if (!timestamp) return '日時不明';
+  const d = new Date(timestamp);
+  if (isNaN(d.getTime())) return '日時不明';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${y}/${m}/${day} ${h}:${min}`;
+}
+
+function formatFileSize(bytes) {
+  if (!bytes || isNaN(bytes)) return '0 KB';
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function setupMergeView() {
   // 選択されているファイルのみを結合対象にする
   const targetDocs = Array.from(state.selectedDocIndices)
@@ -1188,6 +1225,7 @@ function setupMergeView() {
     name: doc.name,
     pageCount: doc.pageCount,
     size: doc.size,
+    lastModified: doc.lastModified || (doc.file ? doc.file.lastModified : Date.now()) || Date.now(),
     arrayBuffer: doc.arrayBuffer
   }));
   state.selectedMergeIds.clear();
@@ -1204,6 +1242,80 @@ function getFormattedDate() {
   return `${y}${m}${day}`;
 }
 
+function updateSortTargetBadge() {
+  if (!dom.sortTargetBadge) return;
+  const total = state.mergeItems.length;
+  const selCount = state.selectedMergeIds.size;
+
+  if (selCount >= 2 && selCount < total) {
+    dom.sortTargetBadge.textContent = `選択中の ${selCount} 件のみ並び替え`;
+    dom.sortTargetBadge.classList.add('has-selection');
+  } else {
+    dom.sortTargetBadge.textContent = `全ファイルを対象 (${total}件)`;
+    dom.sortTargetBadge.classList.remove('has-selection');
+  }
+}
+
+function sortMergeItems(key, direction = 'asc') {
+  if (state.mergeItems.length <= 1) {
+    showToast('並び替えるPDFが2件以上ありません', 'info');
+    return;
+  }
+
+  // 比較関数（自然順ソート）
+  const compareFn = (a, b) => {
+    let result = 0;
+    if (key === 'date') {
+      const timeA = a.lastModified || 0;
+      const timeB = b.lastModified || 0;
+      result = timeA - timeB;
+      // 日時が同じならファイル名順でタイブレーク
+      if (result === 0) {
+        result = (a.name || '').localeCompare(b.name || '', 'ja', { numeric: true, sensitivity: 'base' });
+      }
+    } else if (key === 'name') {
+      result = (a.name || '').localeCompare(b.name || '', 'ja', { numeric: true, sensitivity: 'base' });
+    }
+    return direction === 'desc' ? -result : result;
+  };
+
+  const selCount = state.selectedMergeIds.size;
+  const isSubset = selCount >= 2 && selCount < state.mergeItems.length;
+
+  if (isSubset) {
+    // 選択されたPDFの位置（インデックススロット）を保持したまま、そのスロット内のみで並び替え
+    const selectedIndices = [];
+    const selectedItems = [];
+
+    state.mergeItems.forEach((item, idx) => {
+      if (state.selectedMergeIds.has(item.id)) {
+        selectedIndices.push(idx);
+        selectedItems.push(item);
+      }
+    });
+
+    selectedItems.sort(compareFn);
+
+    selectedIndices.forEach((origIdx, i) => {
+      state.mergeItems[origIdx] = selectedItems[i];
+    });
+
+    const sortLabel = key === 'date'
+      ? `更新日時（${direction === 'asc' ? '古い順' : '新しい順'}）`
+      : `ファイル名（${direction === 'asc' ? '昇順' : '降順'}）`;
+    showToast(`選択した ${selCount} 件を${sortLabel}で並び替えました`, 'success');
+  } else {
+    // 全ファイルを並び替え
+    state.mergeItems.sort(compareFn);
+    const sortLabel = key === 'date'
+      ? `更新日時（${direction === 'asc' ? '古い順' : '新しい順'}）`
+      : `ファイル名（${direction === 'asc' ? '昇順' : '降順'}）`;
+    showToast(`全ファイルを${sortLabel}で並び替えました`, 'success');
+  }
+
+  renderMergeList();
+}
+
 function initMergeListeners() {
   dom.btnMergeAddMore.addEventListener('click', () => dom.mergeAddInput.click());
   dom.mergeAddInput.addEventListener('change', async (e) => {
@@ -1217,6 +1329,7 @@ function initMergeListeners() {
         name: doc.name,
         pageCount: doc.pageCount,
         size: doc.size,
+        lastModified: doc.lastModified || (file ? file.lastModified : Date.now()) || Date.now(),
         arrayBuffer: doc.arrayBuffer
       });
     }
@@ -1231,6 +1344,20 @@ function initMergeListeners() {
     }
     renderMergeList();
   });
+
+  // ワンクリック並び替えボタンの登録
+  if (dom.btnSortDateAsc) {
+    dom.btnSortDateAsc.addEventListener('click', () => sortMergeItems('date', 'asc'));
+  }
+  if (dom.btnSortDateDesc) {
+    dom.btnSortDateDesc.addEventListener('click', () => sortMergeItems('date', 'desc'));
+  }
+  if (dom.btnSortNameAsc) {
+    dom.btnSortNameAsc.addEventListener('click', () => sortMergeItems('name', 'asc'));
+  }
+  if (dom.btnSortNameDesc) {
+    dom.btnSortNameDesc.addEventListener('click', () => sortMergeItems('name', 'desc'));
+  }
 
   dom.btnRunMerge.addEventListener('click', executeMerge);
 }
@@ -1248,14 +1375,24 @@ function renderMergeList() {
     div.dataset.index = index;
 
     div.innerHTML = `
-      <div class="merge-handle"><i data-lucide="grip-vertical"></i></div>
-      <input type="checkbox" class="merge-checkbox" ${isSelected ? 'checked' : ''}>
+      <div class="merge-handle" title="ドラッグして位置を移動"><i data-lucide="grip-vertical"></i></div>
+      <input type="checkbox" class="merge-checkbox" ${isSelected ? 'checked' : ''} title="選択 / 選択解除">
       <span class="file-icon">📄</span>
       <div class="merge-info">
-        <div class="merge-filename">${item.name}</div>
-        <div class="merge-pages">${item.pageCount} ページ</div>
+        <div class="merge-filename">${escapeHtml(item.name)}</div>
+        <div class="merge-meta-row">
+          <span class="merge-meta-item merge-date-badge" title="最終更新日時">
+            <i data-lucide="clock"></i> ${formatDateTime(item.lastModified)}
+          </span>
+          <span class="merge-meta-item" title="ページ数">
+            <i data-lucide="file-text"></i> ${item.pageCount} ページ
+          </span>
+          <span class="merge-meta-item" title="ファイルサイズ">
+            <i data-lucide="hard-drive"></i> ${formatFileSize(item.size)}
+          </span>
+        </div>
       </div>
-      <button class="btn-ghost text-danger btn-sm" onclick="window.removeMergeItem('${item.id}')">
+      <button class="btn-ghost text-danger btn-sm" onclick="window.removeMergeItem('${item.id}')" title="一覧から除外">
         <i data-lucide="trash-2"></i>
       </button>
     `;
@@ -1270,6 +1407,7 @@ function renderMergeList() {
         state.selectedMergeIds.delete(item.id);
       }
       div.classList.toggle('selected', e.target.checked);
+      updateSortTargetBadge();
     });
 
     // Multi-select with Shift/Ctrl Click
@@ -1293,6 +1431,8 @@ function renderMergeList() {
 
     container.appendChild(div);
   });
+
+  updateSortTargetBadge();
 
   if (window.lucide) window.lucide.createIcons();
 }
