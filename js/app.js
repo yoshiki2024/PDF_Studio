@@ -463,6 +463,9 @@ const dom = {
   pdfRenderCanvas: document.getElementById('pdf-render-canvas'),
   textInteractionLayer: document.getElementById('text-interaction-layer'),
   userElementsLayer: document.getElementById('user-elements-layer'),
+  btnApplySelectionHighlight: document.getElementById('btn-apply-selection-highlight'),
+  quickHighlightPopup: document.getElementById('quick-highlight-popup'),
+  btnQuickHlAction: document.getElementById('btn-quick-hl-action'),
   zoomLevelText: document.getElementById('zoom-level-text'),
   btnZoomIn: document.getElementById('btn-zoom-in'),
   btnZoomOut: document.getElementById('btn-zoom-out'),
@@ -1350,6 +1353,7 @@ async function renderEditCanvas(pageNum) {
 function renderTextInteractionLayer(items) {
   const container = dom.textInteractionLayer;
   container.innerHTML = '';
+  container.classList.toggle('select-mode', state.activeTool === 'select');
 
   items.forEach((item) => {
     const box = document.createElement('div');
@@ -1358,72 +1362,142 @@ function renderTextInteractionLayer(items) {
     box.style.top = `${item.y}px`;
     box.style.width = `${item.width}px`;
     box.style.height = `${item.height}px`;
+    box.style.fontSize = `${item.fontSize}px`;
+    box.textContent = item.str;
+
     box.title = state.activeTool === 'highlight'
-      ? `クリックしてハイライトを適用/解除: "${item.str}"`
+      ? `マウスで文字をドラッグ選択してハイライト`
       : `クリックして文字選択・編集: "${item.str}"`;
 
     box.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (state.activeTool === 'highlight') {
-        applyHighlightToTextItem(item);
-      } else {
+      // マウスドラッグで文字を選択した直後は通常の文字編集化をスキップ
+      const sel = window.getSelection();
+      if (sel && sel.toString().trim().length > 0) {
+        return;
+      }
+      if (state.activeTool === 'select') {
         selectAndEditText(item, box);
       }
     });
 
     box.addEventListener('dblclick', (e) => {
       e.stopPropagation();
-      if (state.activeTool !== 'highlight') {
+      if (state.activeTool === 'select') {
         createInlineEditor(item);
       }
     });
 
-    // プレビュー上の元文字を直接ドラッグ移動できるように設定
+    // プレビュー上の元文字を直接ドラッグ移動できるように設定 (selectモード時)
     makeRawTextDraggable(box, item);
 
     container.appendChild(box);
   });
 }
 
-function applyHighlightToTextItem(item) {
+function applyHighlightToCurrentSelection(customColor = null) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+    showToast('文字が選択されていません。プレビュー上の文字をマウスでドラッグして選択してください', 'error');
+    return false;
+  }
+
+  const selectedText = selection.toString().trim();
+  if (!selectedText) {
+    showToast('文字が選択されていません', 'error');
+    return false;
+  }
+
+  const range = selection.getRangeAt(0);
+  const stageRect = dom.canvasStage.getBoundingClientRect();
+  const clientRects = Array.from(range.getClientRects());
+
+  if (clientRects.length === 0) {
+    showToast('選択範囲の取得に失敗しました', 'error');
+    return false;
+  }
+
+  const color = customColor || state.activeHighlightColor || '#FFF275';
   const edits = state.pageEdits[state.currentEditPage] || [];
-  const padX = 2;
-  const padY = 2;
-  const targetX = Math.max(0, item.x - padX);
-  const targetY = Math.max(0, item.y - padY);
-  const targetW = item.width + padX * 2;
-  const targetH = item.height + padY * 2;
+  let addedCount = 0;
 
-  // 既存の同一位置ハイライトがあればトグル解除
-  const existingIdx = edits.findIndex(e =>
-    e.type === 'highlight' &&
-    Math.abs(e.x - targetX) < 8 &&
-    Math.abs(e.y - targetY) < 8
-  );
+  clientRects.forEach((r, idx) => {
+    if (r.width < 1 || r.height < 1) return;
 
-  if (existingIdx !== -1) {
-    edits.splice(existingIdx, 1);
-    state.selectedElementId = null;
-    showToast('ハイライトを解除しました');
-  } else {
+    // canvasStage相対座標に変換
+    const x = Math.max(0, r.left - stageRect.left - 1);
+    const y = Math.max(0, r.top - stageRect.top);
+    const width = Math.max(r.width + 2, 4);
+    const height = Math.max(r.height, 8);
+
     const newHighlight = {
-      id: `highlight-${Date.now()}`,
+      id: `highlight-${Date.now()}-${idx}`,
       type: 'highlight',
-      x: targetX,
-      y: targetY,
-      width: targetW,
-      height: targetH,
-      color: state.activeHighlightColor || '#FFF275',
+      x: Math.round(x),
+      y: Math.round(y),
+      width: Math.round(width),
+      height: Math.round(height),
+      color: color,
       canvasWidth: dom.pdfRenderCanvas.width,
       canvasHeight: dom.pdfRenderCanvas.height
     };
+
     edits.push(newHighlight);
-    state.selectedElementId = newHighlight.id;
-    showToast(`「${item.str}」にハイライトを適用しました`);
-  }
+    addedCount++;
+  });
+
+  // 選択解除
+  selection.removeAllRanges();
+  hideQuickHighlightPopup();
 
   renderUserElements();
   updateLayerList();
+
+  const previewStr = selectedText.length > 12 ? selectedText.substring(0, 12) + '...' : selectedText;
+  showToast(`「${previewStr}」にハイライトを適用しました`, 'success');
+  return true;
+}
+
+function checkAndShowQuickHighlightPopup() {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+    hideQuickHighlightPopup();
+    return;
+  }
+
+  const text = selection.toString().trim();
+  if (!text) {
+    hideQuickHighlightPopup();
+    return;
+  }
+
+  const range = selection.getRangeAt(0);
+  const stageRect = dom.canvasStage.getBoundingClientRect();
+  const rect = range.getBoundingClientRect();
+
+  // stageの範囲外なら表示しない
+  if (rect.bottom < stageRect.top || rect.top > stageRect.bottom ||
+      rect.right < stageRect.left || rect.left > stageRect.right) {
+    hideQuickHighlightPopup();
+    return;
+  }
+
+  const popup = dom.quickHighlightPopup;
+  if (!popup) return;
+
+  const popupX = (rect.left + rect.width / 2) - stageRect.left;
+  const popupY = (rect.top - stageRect.top) - 10;
+
+  popup.style.left = `${Math.max(30, popupX)}px`;
+  popup.style.top = `${Math.max(10, popupY)}px`;
+  popup.classList.remove('hidden');
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function hideQuickHighlightPopup() {
+  if (dom.quickHighlightPopup) {
+    dom.quickHighlightPopup.classList.add('hidden');
+  }
 }
 
 function ensureTextEditElement(item) {
@@ -1927,21 +2001,21 @@ function activateTool(toolName) {
   dom.panelRedactOptions.classList.toggle('hidden', toolName !== 'redact');
   dom.panelImageOptions.classList.toggle('hidden', toolName !== 'image');
 
+  dom.textInteractionLayer.classList.toggle('select-mode', toolName === 'select');
+
   if (toolName === 'highlight') {
     dom.textInteractionLayer.style.pointerEvents = 'auto';
-    dom.textInteractionLayer.classList.add('highlight-cursor');
-    dom.canvasStage.style.cursor = 'pointer';
+    dom.canvasStage.style.cursor = 'text';
   } else if (toolName === 'redact') {
     dom.textInteractionLayer.style.pointerEvents = 'none';
-    dom.textInteractionLayer.classList.remove('highlight-cursor');
     dom.canvasStage.style.cursor = 'crosshair';
+    hideQuickHighlightPopup();
   } else if (toolName === 'text') {
     dom.textInteractionLayer.style.pointerEvents = 'none';
-    dom.textInteractionLayer.classList.remove('highlight-cursor');
     dom.canvasStage.style.cursor = 'text';
+    hideQuickHighlightPopup();
   } else {
     dom.textInteractionLayer.style.pointerEvents = 'auto';
-    dom.textInteractionLayer.classList.remove('highlight-cursor');
     dom.canvasStage.style.cursor = 'default';
   }
 }
@@ -2077,13 +2151,66 @@ function initEditListeners() {
     }
   });
 
-  // Highlight Color Preset Chips
+  // Highlight Button (サイドバー「選択した文字をハイライト」ボタン)
+  if (dom.btnApplySelectionHighlight) {
+    dom.btnApplySelectionHighlight.addEventListener('click', () => {
+      applyHighlightToCurrentSelection();
+    });
+  }
+
+  // Floating Quick Highlight Popup Button
+  if (dom.btnQuickHlAction) {
+    dom.btnQuickHlAction.addEventListener('click', () => {
+      applyHighlightToCurrentSelection();
+    });
+  }
+
+  // Quick Highlight Color Dots
+  document.querySelectorAll('.quick-color-dot[data-hl-color]').forEach(dot => {
+    dot.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const color = dot.dataset.hlColor;
+      state.activeHighlightColor = color;
+      document.querySelectorAll('.quick-color-dot').forEach(d => d.classList.toggle('active', d === dot));
+      document.querySelectorAll('.color-chip[data-hl-color]').forEach(c => c.classList.toggle('active', c.dataset.hlColor === color));
+      applyHighlightToCurrentSelection(color);
+    });
+  });
+
+  // Highlight Color Preset Chips (サイドバー)
   document.querySelectorAll('.color-chip[data-hl-color]').forEach(chip => {
     chip.addEventListener('click', () => {
       document.querySelectorAll('.color-chip[data-hl-color]').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-      state.activeHighlightColor = chip.dataset.hlColor;
+      const color = chip.dataset.hlColor;
+      state.activeHighlightColor = color;
+      document.querySelectorAll('.quick-color-dot').forEach(d => d.classList.toggle('active', d.dataset.hlColor === color));
+
+      // もし文字が選択状態にあれば、その色で即座にハイライトを適用！
+      const sel = window.getSelection();
+      if (sel && sel.toString().trim().length > 0) {
+        applyHighlightToCurrentSelection(color);
+      }
     });
+  });
+
+  // Canvas Stage Mouseup - 文字ドラッグ選択完了時にクイックハイライトポップアップを表示
+  dom.canvasStage.addEventListener('mouseup', () => {
+    setTimeout(() => {
+      checkAndShowQuickHighlightPopup();
+    }, 30);
+  });
+
+  // 画面クリックで選択解除されたらポップアップを閉じる
+  document.addEventListener('mousedown', (e) => {
+    if (dom.quickHighlightPopup && !dom.quickHighlightPopup.contains(e.target) && !dom.btnApplySelectionHighlight?.contains(e.target)) {
+      setTimeout(() => {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed) {
+          hideQuickHighlightPopup();
+        }
+      }, 60);
+    }
   });
 
   // Image Upload Listener

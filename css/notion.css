@@ -1237,19 +1237,33 @@ body {
 }
 .text-item-box {
   position: absolute;
-  border: 1px solid rgba(35, 131, 226, 0.2);
-  background-color: rgba(35, 131, 226, 0.03);
-  cursor: pointer;
-  transition: all 0.1s ease;
-  border-radius: 2px;
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: transparent;
+  cursor: text;
+  white-space: pre;
+  user-select: text;
+  -webkit-user-select: text;
   box-sizing: border-box;
+  transform-origin: 0 0;
+  line-height: 1.1;
+  transition: border-color 0.1s ease;
 }
-.text-item-box:hover {
-  background-color: rgba(35, 131, 226, 0.25);
+.text-item-box::selection {
+  background: rgba(35, 131, 226, 0.45);
+  color: #FFFFFF;
+}
+/* 選択・編集ツールの時は薄く枠線を表示してクリック位置が分かるようにする */
+.text-interaction-layer.select-mode .text-item-box {
+  border: 1px solid rgba(35, 131, 226, 0.18);
+  background-color: rgba(35, 131, 226, 0.02);
+}
+.text-interaction-layer.select-mode .text-item-box:hover {
+  background-color: rgba(35, 131, 226, 0.15);
   border-color: var(--notion-blue);
 }
 .text-item-box.selected {
-  background-color: rgba(35, 131, 226, 0.35);
+  background-color: rgba(35, 131, 226, 0.25);
   border: 2px solid var(--notion-blue);
 }
 
@@ -1308,12 +1322,65 @@ body {
   border-radius: 2px;
   pointer-events: none;
 }
-.text-interaction-layer.highlight-cursor .text-item-box {
-  cursor: pointer;
+/* Quick Highlight Popup */
+.quick-highlight-popup {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  background: #FFFFFF;
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.08);
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 60;
+  pointer-events: auto;
+  user-select: none;
+  animation: popupFadeIn 0.15s ease-out;
 }
-.text-interaction-layer.highlight-cursor .text-item-box:hover {
-  background-color: rgba(255, 242, 117, 0.45);
-  border-color: #E0A800;
+@keyframes popupFadeIn {
+  from { opacity: 0; transform: translate(-50%, -85%); }
+  to { opacity: 1; transform: translate(-50%, -100%); }
+}
+.btn-quick-hl {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--notion-blue);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+.btn-quick-hl:hover {
+  background: #1c6ec0;
+}
+.quick-hl-colors {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-left: 4px;
+  border-left: 1px solid var(--notion-border);
+}
+.quick-color-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s ease;
+}
+.quick-color-dot:hover {
+  transform: scale(1.2);
+}
+.quick-color-dot.active {
+  border-color: #333333;
 }
 .user-image-el {
   position: absolute;

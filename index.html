@@ -454,7 +454,15 @@
             <!-- Highlight Panel -->
             <div id="panel-highlight-options" class="sidebar-section hidden">
               <div class="sidebar-title"><i data-lucide="highlighter"></i> ハイライト設定</div>
-              <p class="text-sm text-muted">プレビュー画面上の文字（テキスト）をクリックしてハイライトを適用・解除します。</p>
+              <p class="text-sm text-muted">プレビュー画面上の文字をドラッグ選択して「ハイライト」ボタンを押します。</p>
+              
+              <div class="prop-group" style="margin-top: 10px;">
+                <button type="button" id="btn-apply-selection-highlight" class="btn-notion btn-primary w-full" style="justify-content: center; gap: 8px;">
+                  <i data-lucide="highlighter"></i>
+                  <span>選択した文字をハイライト</span>
+                </button>
+              </div>
+
               <div class="prop-group">
                 <label>マーカー色:</label>
                 <div class="color-palette-presets">
@@ -519,6 +527,19 @@
               <div id="user-elements-layer" class="user-elements-layer"></div>
               <!-- Drag Drawing Guide Box -->
               <div id="drag-guide-box" class="drag-guide-box hidden"></div>
+              <!-- Floating Quick Highlight Popup -->
+              <div id="quick-highlight-popup" class="quick-highlight-popup hidden">
+                <button type="button" class="btn-quick-hl" id="btn-quick-hl-action" title="選択した文字をハイライト">
+                  <i data-lucide="highlighter"></i>
+                  <span>ハイライト</span>
+                </button>
+                <div class="quick-hl-colors">
+                  <button type="button" class="quick-color-dot active" data-hl-color="#FFF275" style="background:#FFF275;" title="イエロー"></button>
+                  <button type="button" class="quick-color-dot" data-hl-color="#D8F8E1" style="background:#85E3A1;" title="グリーン"></button>
+                  <button type="button" class="quick-color-dot" data-hl-color="#FCDDEC" style="background:#F694C7;" title="ピンク"></button>
+                  <button type="button" class="quick-color-dot" data-hl-color="#D4E8FE" style="background:#7CB9FA;" title="ブルー"></button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
