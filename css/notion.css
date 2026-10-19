@@ -1410,11 +1410,12 @@ body {
   position: absolute;
   background: #FFF;
   border: 2px solid var(--notion-blue);
-  border-radius: 4px;
-  padding: 3px 6px;
+  border-radius: 3px;
+  padding: 0 4px;
+  margin: 0;
+  box-sizing: border-box;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
   z-index: 200;
-  font-family: inherit;
   outline: none;
 }
 
