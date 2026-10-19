@@ -1,7 +1,13 @@
-// Configure PDF.js worker
+// Configure PDF.js worker (Chrome Extension & Local Offline Support)
 if (window.pdfjsLib) {
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  try {
+    const isExtension = typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function';
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = isExtension
+      ? chrome.runtime.getURL('js/libs/pdf.worker.min.js')
+      : 'js/libs/pdf.worker.min.js';
+  } catch (e) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/libs/pdf.worker.min.js';
+  }
 }
 
 /**
