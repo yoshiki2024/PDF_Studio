@@ -1,0 +1,1543 @@
+/* ==========================================================================
+   Notion Design System - Stylesheet
+   ========================================================================== */
+
+:root {
+  /* Notion Color Palette */
+  --notion-bg: #FFFFFF;
+  --notion-sidebar: #F7F6F3;
+  --notion-card: #FFFFFF;
+  --notion-border: #E9E9E7;
+  --notion-border-hover: #D3D3D0;
+  --notion-text: #37352F;
+  --notion-text-muted: #787774;
+  --notion-text-light: #9B9A97;
+  --notion-hover: rgba(55, 53, 47, 0.08);
+  --notion-hover-subtle: rgba(55, 53, 47, 0.04);
+  --notion-active: rgba(55, 53, 47, 0.16);
+
+  /* Brand Accents */
+  --notion-blue: #2383E2;
+  --notion-blue-hover: #1b68b3;
+  --notion-blue-subtle: #E8F3FC;
+  --notion-red: #EB5757;
+  --notion-red-subtle: #FBEBEB;
+  --notion-green: #27AE60;
+  --notion-green-subtle: #EBF8F1;
+  --notion-orange: #E8833A;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(15, 15, 15, 0.05);
+  --shadow-md: 0 4px 12px rgba(15, 15, 15, 0.08), 0 0 0 1px rgba(15, 15, 15, 0.05);
+  --shadow-lg: 0 12px 24px -4px rgba(15, 15, 15, 0.12), 0 0 0 1px rgba(15, 15, 15, 0.06);
+
+  /* Typography */
+  --font-sans: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'Roboto Mono', monospace;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+/* Reset & Basics */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--notion-text);
+  background-color: var(--notion-bg);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* App Container */
+.notion-workspace {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Topbar */
+.notion-topbar {
+  height: 48px;
+  border-bottom: 1px solid var(--notion-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background-color: var(--notion-bg);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.workspace-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.workspace-badge:hover {
+  background: var(--notion-hover);
+}
+
+.breadcrumb-separator {
+  color: var(--notion-text-light);
+}
+
+.breadcrumbs .crumb {
+  color: var(--notion-text-muted);
+  cursor: pointer;
+}
+.breadcrumbs .crumb.active {
+  color: var(--notion-text);
+  font-weight: 500;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.badge-safe {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--notion-green);
+  background: var(--notion-green-subtle);
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+.badge-safe svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Notion Buttons */
+.btn-notion {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btn-notion svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-primary {
+  background-color: var(--notion-blue);
+  color: #FFFFFF;
+}
+.btn-primary:hover {
+  background-color: var(--notion-blue-hover);
+}
+
+.btn-secondary {
+  background-color: var(--notion-bg);
+  border-color: var(--notion-border);
+  color: var(--notion-text);
+}
+.btn-secondary:hover {
+  background-color: var(--notion-hover-subtle);
+  border-color: var(--notion-border-hover);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--notion-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-ghost:hover {
+  background-color: var(--notion-hover);
+  color: var(--notion-text);
+}
+.btn-ghost.text-danger:hover {
+  color: var(--notion-red);
+  background-color: var(--notion-red-subtle);
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--notion-border);
+  background: #FFF;
+  color: var(--notion-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-icon:hover {
+  background: var(--notion-hover-subtle);
+  border-color: var(--notion-border-hover);
+}
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Notion Inputs & Select */
+.notion-input, .notion-select {
+  padding: 6px 10px;
+  font-size: 14px;
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-sm);
+  background: var(--notion-bg);
+  color: var(--notion-text);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.notion-input:focus, .notion-select:focus {
+  border-color: var(--notion-blue);
+  box-shadow: 0 0 0 2px var(--notion-blue-subtle);
+}
+.input-sm, .select-sm {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+/* Main Area Layout */
+.notion-main {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 36px 28px 60px;
+}
+
+/* View panels switcher */
+.view-panel {
+  display: none;
+  animation: fadeIn 0.2s ease-in-out;
+}
+.view-panel.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Page Header (Notion Page Style) */
+.page-header {
+  margin-bottom: 24px;
+}
+.page-icon {
+  font-size: 48px;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+.page-title {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--notion-text);
+  margin-bottom: 8px;
+}
+.page-description {
+  font-size: 15px;
+  color: var(--notion-text-muted);
+  max-width: 980px;
+  line-height: 1.6;
+}
+.text-nowrap {
+  white-space: nowrap;
+}
+
+/* Callout Block */
+.notion-callout {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  background-color: var(--notion-sidebar);
+  border-radius: var(--radius-sm);
+  margin-bottom: 24px;
+  border: 1px solid var(--notion-border);
+  font-size: 14px;
+}
+.callout-icon {
+  font-size: 18px;
+  line-height: 1.4;
+}
+.callout-text {
+  color: var(--notion-text);
+  line-height: 1.5;
+}
+.callout-safety-list {
+  margin-top: 6px;
+  margin-left: 20px;
+  font-size: 13px;
+  color: var(--notion-text);
+  line-height: 1.6;
+}
+.callout-safety-list li {
+  margin-bottom: 4px;
+}
+
+/* Drop Zone */
+.drop-zone {
+  border: 2px dashed var(--notion-border-hover);
+  border-radius: var(--radius-lg);
+  padding: 60px 20px;
+  text-align: center;
+  background-color: #FAFAFA;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: var(--notion-blue);
+  background-color: var(--notion-blue-subtle);
+}
+.drop-icon-wrapper {
+  margin-bottom: 16px;
+}
+.drop-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--notion-text-muted);
+  stroke-width: 1.5;
+}
+.drop-zone h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.drop-zone p {
+  color: var(--notion-text-muted);
+  font-size: 14px;
+  margin-bottom: 18px;
+}
+.file-input-hidden {
+  display: none;
+}
+
+/* Loaded Files Summary & Mode Selection */
+.loaded-summary {
+  margin-top: 28px;
+}
+.loaded-summary.hidden {
+  display: none;
+}
+.summary-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--notion-border);
+  margin-bottom: 14px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.summary-header h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.summary-header h4 svg {
+  width: 18px;
+  height: 18px;
+  color: var(--notion-green);
+}
+.summary-subtext {
+  font-size: 12px;
+  color: var(--notion-text-muted);
+  line-height: 1.4;
+}
+.summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.selected-count-badge {
+  background: #e8f3fc;
+  color: var(--notion-blue);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.loaded-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+.file-item-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--notion-sidebar);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.file-item-chip:hover {
+  background: #f1f1ef;
+}
+.file-item-chip.selected {
+  background: #f3f8fd;
+  border-color: #7bb4eb;
+  box-shadow: 0 1px 3px rgba(35, 131, 226, 0.08);
+}
+.file-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.file-select-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--notion-blue);
+  flex-shrink: 0;
+}
+.file-item-left strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 480px;
+}
+.file-item-meta {
+  color: var(--notion-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Mode Selection Cards Grid */
+.mode-select-section {
+  margin-top: 32px;
+}
+.section-heading {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.mode-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+.mode-card {
+  background: var(--notion-card);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+}
+.mode-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--notion-blue);
+  box-shadow: var(--shadow-md);
+}
+.mode-card .card-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+.mode-card h4 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--notion-text);
+}
+.mode-card p {
+  font-size: 13px;
+  color: var(--notion-text-muted);
+  line-height: 1.4;
+  margin-bottom: 14px;
+  flex: 1;
+}
+.card-footer-tags {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+.card-tag {
+  align-self: flex-start;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--notion-sidebar);
+  color: var(--notion-text-muted);
+  border-radius: 12px;
+  font-weight: 500;
+}
+.card-requirement {
+  font-size: 11px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--notion-text-muted);
+}
+.card-requirement svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Disabled State for Mode Cards */
+.mode-card.disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  pointer-events: none;
+  background: #fafaf9;
+  border-color: var(--notion-border);
+  box-shadow: none;
+  transform: none;
+  filter: grayscale(0.5);
+}
+.mode-card.disabled:hover {
+  transform: none;
+  border-color: var(--notion-border);
+  box-shadow: none;
+}
+.mode-card.disabled .card-requirement {
+  color: #d9383a;
+  font-weight: 600;
+}
+.mode-card:not(.disabled) .card-requirement {
+  color: #0f7b6c;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   VIEW: Merge
+   ========================================================================== */
+.merge-toolbar-card {
+  background: var(--notion-sidebar);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.form-group-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.merge-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.merge-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  background: var(--notion-bg);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.merge-item:hover {
+  border-color: var(--notion-border-hover);
+  box-shadow: var(--shadow-sm);
+}
+.merge-item.selected {
+  border-color: var(--notion-blue);
+  background-color: var(--notion-blue-subtle);
+}
+.merge-item.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+.merge-item.drag-over {
+  border-top: 3px solid var(--notion-blue);
+}
+.merge-handle {
+  color: var(--notion-text-light);
+  cursor: grab;
+}
+.merge-thumb {
+  width: 44px;
+  height: 56px;
+  background: #eee;
+  border-radius: 2px;
+  border: 1px solid var(--notion-border);
+  object-fit: cover;
+}
+.merge-info {
+  flex: 1;
+}
+.merge-filename {
+  font-size: 14px;
+  font-weight: 500;
+}
+.merge-pages {
+  font-size: 12px;
+  color: var(--notion-text-muted);
+}
+
+/* ==========================================================================
+   VIEW: Split
+   ========================================================================== */
+.split-controls-card {
+  background: var(--notion-sidebar);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.split-rule-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.control-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.control-label svg {
+  width: 16px;
+  height: 16px;
+}
+.rule-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.split-shortcuts-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  border-top: 1px solid var(--notion-border);
+  padding-top: 10px;
+}
+.chip-btn {
+  background: transparent;
+  border: 1px solid var(--notion-border);
+  border-radius: 14px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--notion-text);
+  transition: all 0.15s ease;
+}
+.chip-btn:hover {
+  background: var(--notion-hover);
+}
+
+.split-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+.split-page-card {
+  background: var(--notion-bg);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+.split-page-card:hover {
+  border-color: var(--notion-border-hover);
+  box-shadow: var(--shadow-sm);
+}
+.split-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+}
+.split-thumb-wrapper {
+  background: #f0f0f0;
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-sm);
+  aspect-ratio: 1 / 1.414;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.split-thumb-wrapper canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.split-filename-input {
+  width: 100%;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+/* ==========================================================================
+   VIEW: Rotate
+   ========================================================================== */
+.rotate-toolbar-card {
+  background: var(--notion-sidebar);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.rotate-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rotate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+}
+.rotate-card {
+  background: var(--notion-bg);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+.rotate-card:hover {
+  box-shadow: var(--shadow-sm);
+  border-color: var(--notion-border-hover);
+}
+.rotate-thumb-container {
+  aspect-ratio: 1 / 1.414;
+  background: #F4F4F2;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--notion-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+.rotate-thumb-container canvas {
+  transition: transform 0.25s ease;
+  max-width: 90%;
+  max-height: 90%;
+}
+.rotate-angle-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.rotate-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* ==========================================================================
+   VIEW: Edit - Page Select
+   ========================================================================== */
+.edit-select-bar {
+  background: var(--notion-sidebar);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.edit-status-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--notion-blue);
+}
+
+.edit-page-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+}
+.edit-page-card {
+  background: var(--notion-bg);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+.edit-page-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--notion-blue);
+  box-shadow: var(--shadow-md);
+}
+.edit-page-thumb {
+  aspect-ratio: 1 / 1.414;
+  background: #F7F6F3;
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.edit-page-thumb canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.edit-page-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 500;
+}
+.edited-pill {
+  font-size: 11px;
+  background: var(--notion-green-subtle);
+  color: var(--notion-green);
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   VIEW: Edit - Single Page Workspace
+   ========================================================================== */
+.edit-workspace-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--notion-border);
+  margin-bottom: 16px;
+}
+.edit-workspace-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.header-divider {
+  color: var(--notion-border);
+}
+.edit-workspace-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.edit-studio-layout {
+  display: flex;
+  gap: 20px;
+  height: calc(100vh - 170px);
+  min-height: 600px;
+}
+
+/* Sidebar Tool Panel */
+.edit-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--notion-sidebar);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sidebar-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--notion-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sidebar-title svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tool-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tool-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--notion-text);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+.tool-tab:hover {
+  background: var(--notion-hover);
+}
+.tool-tab.active {
+  background: var(--notion-card);
+  color: var(--notion-blue);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+}
+.tool-tab svg {
+  width: 16px;
+  height: 16px;
+}
+
+.prop-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.prop-group-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.notion-color-picker {
+  height: 32px;
+  width: 100%;
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  background: #FFF;
+  cursor: pointer;
+}
+.toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* Stamp Presets */
+.stamp-presets {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.stamp-btn {
+  padding: 8px 6px;
+  background: #FFF;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.stamp-inner {
+  font-size: 12px;
+  font-weight: 700;
+  border: 2px solid;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+.stamp-red .stamp-inner {
+  color: var(--notion-red);
+  border-color: var(--notion-red);
+}
+.stamp-blue .stamp-inner {
+  color: var(--notion-blue);
+  border-color: var(--notion-blue);
+}
+.stamp-green .stamp-inner {
+  color: var(--notion-green);
+  border-color: var(--notion-green);
+}
+.stamp-btn:hover {
+  transform: scale(1.04);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Layer list */
+.layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.layer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: var(--notion-card);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+.layer-item-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+/* Right: Canvas Viewport */
+.edit-canvas-viewport {
+  flex: 1;
+  background: #EAE9E6;
+  border-radius: var(--radius-md);
+  position: relative;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px;
+}
+.canvas-zoom-bar {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  padding: 4px 8px;
+  border-radius: 20px;
+  box-shadow: var(--shadow-md);
+  z-index: 10;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.canvas-stage {
+  position: relative;
+  background: #FFFFFF;
+  box-shadow: var(--shadow-lg);
+  user-select: none;
+}
+#pdf-render-canvas {
+  display: block;
+}
+
+/* Style Toggle Buttons: Bold, Italic */
+.style-toggle-buttons {
+  display: flex;
+  gap: 6px;
+}
+.btn-style-toggle {
+  width: 34px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--notion-border);
+  background: #FFF;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--notion-text);
+  transition: all 0.15s ease;
+}
+.btn-style-toggle:hover {
+  background: var(--notion-hover);
+}
+.btn-style-toggle.active {
+  background: var(--notion-blue);
+  color: #FFF;
+  border-color: var(--notion-blue);
+}
+
+/* Color Palette Presets */
+.color-palette-presets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.color-chip {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.color-chip:hover {
+  transform: scale(1.15);
+}
+.color-chip.active {
+  box-shadow: 0 0 0 2px #FFF, 0 0 0 4px var(--notion-blue);
+}
+.custom-color-input {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--notion-border);
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+}
+
+/* Size Slider */
+.size-input-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.notion-slider {
+  flex: 1;
+  accent-color: var(--notion-blue);
+  cursor: pointer;
+}
+
+/* Drag Guide Box */
+.drag-guide-box {
+  position: absolute;
+  border: 2px dashed var(--notion-blue);
+  background-color: rgba(35, 131, 226, 0.15);
+  pointer-events: none;
+  z-index: 20;
+}
+
+/* Text Interaction Layer (Detects existing text) */
+.text-interaction-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: auto;
+  z-index: 2;
+}
+.text-item-box {
+  position: absolute;
+  border: 1px solid rgba(35, 131, 226, 0.2);
+  background-color: rgba(35, 131, 226, 0.03);
+  cursor: pointer;
+  transition: all 0.1s ease;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+.text-item-box:hover {
+  background-color: rgba(35, 131, 226, 0.25);
+  border-color: var(--notion-blue);
+}
+.text-item-box.selected {
+  background-color: rgba(35, 131, 226, 0.35);
+  border: 2px solid var(--notion-blue);
+}
+
+/* User Elements Layer */
+.user-elements-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* 下の文字選択にマウスを通過させる */
+  z-index: 3;
+}
+.user-el {
+  position: absolute;
+  cursor: grab;
+  box-sizing: border-box;
+  pointer-events: auto; /* 配置済み要素のみ操作可能 */
+  will-change: transform;
+  user-select: none;
+  touch-action: none;
+  transition: box-shadow 0.15s ease, outline 0.15s ease;
+}
+.user-el.selected {
+  outline: 2px solid var(--notion-blue);
+  box-shadow: 0 0 6px rgba(35, 131, 226, 0.4);
+}
+.user-el.is-dragging {
+  cursor: grabbing !important;
+  z-index: 100 !important;
+  opacity: 0.9;
+  transition: none !important;
+  box-shadow: 0 4px 16px rgba(35, 131, 226, 0.25) !important;
+}
+.user-text-el {
+  padding: 1px 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.25;
+  z-index: 4;
+}
+.user-orig-mask {
+  position: absolute;
+  background-color: #FFFFFF;
+  pointer-events: none;
+  z-index: 2;
+}
+.user-redact-el {
+  opacity: 1.0;
+  z-index: 3;
+}
+.user-highlight-el {
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+  z-index: 1 !important;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.text-interaction-layer.highlight-cursor .text-item-box {
+  cursor: pointer;
+}
+.text-interaction-layer.highlight-cursor .text-item-box:hover {
+  background-color: rgba(255, 242, 117, 0.45);
+  border-color: #E0A800;
+}
+.user-image-el {
+  position: absolute;
+  display: flex;
+}
+.user-image-el img {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+}
+.resize-handle {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 12px;
+  height: 12px;
+  background: var(--notion-blue);
+  border: 2px solid #FFF;
+  border-radius: 2px;
+  cursor: se-resize;
+  z-index: 10;
+}
+
+/* Inline Edit Floating Input Box */
+.inline-text-editor {
+  position: absolute;
+  background: #FFF;
+  border: 2px solid var(--notion-blue);
+  border-radius: 4px;
+  padding: 3px 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  z-index: 200;
+  font-family: inherit;
+  outline: none;
+}
+
+/* ==========================================================================
+   VIEW: Final Preview
+   ========================================================================== */
+.final-preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--notion-sidebar);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  padding: 14px 20px;
+  margin-bottom: 24px;
+}
+.final-export-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.final-preview-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.preview-pager {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.final-preview-canvas-wrapper {
+  background: #FFF;
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+}
+#final-preview-canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Toast Notifications */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9999;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #37352F;
+  color: #FFF;
+  padding: 12px 18px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  font-size: 14px;
+  animation: slideUp 0.25s ease;
+}
+.toast.toast-success {
+  border-left: 4px solid var(--notion-green);
+}
+.toast.toast-error {
+  border-left: 4px solid var(--notion-red);
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Utilities */
+.hidden { display: none !important; }
+.text-muted { color: var(--notion-text-muted); }
+.text-xs { font-size: 11px; }
+.text-sm { font-size: 12px; }
+.mb-4 { margin-bottom: 16px; }
+.flex-grow { flex: 1; }
+
+/* Scanned PDF Notice */
+.scanned-pdf-notice {
+  display: flex;
+  gap: 14px;
+  padding: 16px 20px;
+  background-color: var(--notion-sidebar);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  margin-top: 36px;
+  font-size: 13px;
+  color: var(--notion-text);
+  line-height: 1.5;
+}
+.scanned-pdf-notice .notice-icon {
+  font-size: 20px;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+.scanned-pdf-notice .notice-content {
+  flex: 1;
+}
+.scanned-pdf-notice h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--notion-text);
+}
+.scanned-pdf-notice p {
+  color: var(--notion-text-muted);
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+.scanned-pdf-notice ul {
+  margin-left: 20px;
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+.scanned-pdf-notice li {
+  margin-bottom: 2px;
+}
+.scanned-pdf-notice .notice-tip {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--notion-border);
+  color: var(--notion-text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Developer & GitHub Info Footer Card */
+.developer-info-card {
+  margin-top: 24px;
+  margin-bottom: 32px;
+  background-color: var(--notion-card-bg);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.dev-card-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dev-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--notion-blue);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.dev-name {
+  font-size: 13px;
+  color: var(--notion-text);
+}
+.dev-desc {
+  font-size: 12px;
+  color: var(--notion-text-muted);
+}
+.dev-card-right {
+  display: flex;
+  align-items: center;
+}
+.dev-github-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  text-decoration: none;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+}
+.dev-github-link:hover {
+  background-color: var(--notion-hover);
+  border-color: var(--notion-text);
+}

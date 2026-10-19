@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF_Studio</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&family=Roboto+Mono&display=swap" rel="stylesheet">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- PDF.js & pdf-lib -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="css/notion.css">
+</head>
+<body>
+  <div id="app" class="notion-workspace">
+    <!-- Notion Header / Top Bar -->
+    <header class="notion-topbar">
+      <div class="topbar-left">
+        <nav id="breadcrumbs" class="breadcrumbs">
+          <span class="crumb active" id="crumb-current">ホーム</span>
+        </nav>
+      </div>
+      <div class="topbar-right">
+        <div class="badge-safe">
+          <i data-lucide="shield-check"></i>
+          <span>100% ローカル処理・非破壊保存</span>
+        </div>
+        <button id="btn-reset-app" class="btn-ghost" title="最初からやり直す">
+          <i data-lucide="rotate-ccw"></i>
+          <span>リセット</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="notion-main">
+      
+      <!-- VIEW: Upload & Initial Landing -->
+      <section id="view-upload" class="view-panel active">
+        <div class="page-header">
+          <div class="page-icon">📑</div>
+          <h1 class="page-title">PDF_Studio</h1>
+          <p class="page-description">
+            結合・分解・向きの変更・テキスト編集を直感的操作で行えます。<br>
+            すべての処理はお使いのPC（ブラウザ内）で完結するため外部サーバーへの送信は一切なく、<span class="text-nowrap">元のファイルは一切上書きされません。</span>
+          </p>
+        </div>
+
+        <div class="notion-callout">
+          <div class="callout-icon">🔒</div>
+          <div class="callout-text">
+            <strong>このツールが安全である根拠（機密書類にも安心）：</strong>
+            <ul class="callout-safety-list">
+              <li><strong>完全ローカル処理（外部送信ゼロ）：</strong> すべての処理はブラウザ内部（メモリ上）で実行され、外部サーバーへの通信やファイルアップロードは一切行われません（オフライン環境でも動作）。</li>
+              <li><strong>非破壊保存（原本保護）：</strong> 読み込んだ元のPDFファイルを直接上書きすることはなく、常に別の新規ファイルとして保存・ダウンロードされます。</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Drop Zone -->
+        <div id="drop-zone" class="drop-zone">
+          <div class="drop-zone-content">
+            <div class="drop-icon-wrapper">
+              <i data-lucide="upload-cloud" class="drop-icon"></i>
+            </div>
+            <h3>PDFファイルをドラッグ＆ドロップ</h3>
+            <p>またはファイルを選択してください（複数選択可能）</p>
+            <input type="file" id="file-input" accept=".pdf,application/pdf" multiple class="file-input-hidden">
+            <button type="button" class="btn-notion btn-primary" onclick="document.getElementById('file-input').click()">
+              <i data-lucide="file-plus"></i>
+              <span>ファイルを選択</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Loaded Files Overview (Hidden until loaded) -->
+        <div id="loaded-summary" class="loaded-summary hidden">
+          <div class="summary-header">
+            <div>
+              <h4><i data-lucide="check-circle-2"></i> 読み込み完了したPDF (<span id="loaded-count">0</span>件) — <span id="selected-count-badge" class="selected-count-badge">0件選択中</span></h4>
+              <p class="summary-subtext">操作を行いたいファイルをチェックしてください（編集・分解・向きの変更は1ファイル、結合は複数ファイル選択）</p>
+            </div>
+            <div class="summary-actions">
+              <button class="btn-notion btn-secondary btn-sm" id="btn-select-all-loaded"><i data-lucide="check-square"></i> すべて選択</button>
+              <button class="btn-notion btn-ghost btn-sm" id="btn-deselect-all-loaded"><i data-lucide="square"></i> 選択解除</button>
+              <button class="btn-ghost text-danger btn-sm" id="btn-clear-files"><i data-lucide="trash-2"></i> クリア</button>
+            </div>
+          </div>
+          <div id="loaded-file-list" class="loaded-file-list"></div>
+
+          <!-- Mode Select Gallery Cards -->
+          <div class="mode-select-section">
+            <h3 class="section-heading">次に実行する操作を選択してください</h3>
+            <div class="mode-cards-grid">
+              <!-- Card: 編集 -->
+              <div class="mode-card" data-mode="edit" id="mode-card-edit">
+                <div class="card-icon">✏️</div>
+                <div class="card-body">
+                  <h4>PDF編集</h4>
+                  <p>1ページずつ文字の修正・追加・削除、墨消し、注釈追加を行います。</p>
+                  <div class="card-footer-tags">
+                    <span class="card-tag">文字置換・スタンプ</span>
+                    <span class="card-requirement" id="req-edit"><i data-lucide="info"></i> 1ファイル選択時のみ</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card: 結合 -->
+              <div class="mode-card" data-mode="merge" id="mode-card-merge">
+                <div class="card-icon">📑</div>
+                <div class="card-body">
+                  <h4>PDF結合</h4>
+                  <p>複数PDFをドラッグ＆ドロップで並び替え、ブロック一括移動して1つにまとめます。</p>
+                  <div class="card-footer-tags">
+                    <span class="card-tag">複数ファイル対応</span>
+                    <span class="card-requirement" id="req-merge"><i data-lucide="info"></i> 複数選択時のみ</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card: 分解 -->
+              <div class="mode-card" data-mode="split" id="mode-card-split">
+                <div class="card-icon">✂️</div>
+                <div class="card-body">
+                  <h4>PDF分解</h4>
+                  <p>1つのPDFを単一ページに分解。通し番号やカスタム名で一括保存します。</p>
+                  <div class="card-footer-tags">
+                    <span class="card-tag">連番リネーム</span>
+                    <span class="card-requirement" id="req-split"><i data-lucide="info"></i> 1ファイル選択時のみ</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card: 向きの変更 -->
+              <div class="mode-card" data-mode="rotate" id="mode-card-rotate">
+                <div class="card-icon">🔄</div>
+                <div class="card-body">
+                  <h4>向きの変更</h4>
+                  <p>サムネイルを見ながらページごとに回転（90°/180°）。一括反転も可能。</p>
+                  <div class="card-footer-tags">
+                    <span class="card-tag">プレビュー回転</span>
+                    <span class="card-requirement" id="req-rotate"><i data-lucide="info"></i> 1ファイル選択時のみ</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scanned PDF Notice -->
+        <div class="scanned-pdf-notice">
+          <div class="notice-icon">⚠️</div>
+          <div class="notice-content">
+            <h4>スキャン等で生成されたPDF（画像化されたPDF）についての注意点</h4>
+            <p>
+              複合機やスキャナー等で紙から取り込まれたPDFは、文字情報を含まない「画像データ」として保存されているため、以下の機能が利用できません：
+            </p>
+            <ul>
+              <li><strong>文字の選択・編集：</strong> スキャンされた文字をクリックして選択したり、文字単位で打ち替える機能は利用できません。</li>
+              <li><strong>文字のハイライト：</strong> テキストデータを対象とした文字単位のハイライトは行えません。</li>
+            </ul>
+            <p class="notice-tip">
+              💡 <strong>代替操作のヒント：</strong> スキャン書類の文字を修正したい場合は、<strong>「墨消し・白塗り」</strong>で隠した上で<strong>「テキスト追加」</strong>を行うことで同様の修正が可能です。また、手動でドラッグしてハイライト（矩形マーカー）を重ねる操作や、PDFの「結合」「分解」「向きの変更」はスキャンPDFでも問題なくご利用いただけます。
+            </p>
+          </div>
+        </div>
+
+        <!-- Author & GitHub Info Footer Card -->
+        <div class="developer-info-card">
+          <div class="dev-card-left">
+            <div class="dev-badge"><i data-lucide="code-2"></i> 作成者・オープンソース情報</div>
+            <div class="dev-name"><strong>ツール名:</strong> PDF_Studio &nbsp;|&nbsp; <strong>Author:</strong> yoshiki2024</div>
+            <div class="dev-desc">Windows / Mac両対応・100%クライアントサイド（ブラウザ内完全処理・機密安心）</div>
+          </div>
+          <div class="dev-card-right">
+            <a href="https://github.com/yoshiki2024/PDF_Studio" target="_blank" rel="noopener noreferrer" class="btn-notion btn-secondary btn-sm dev-github-link">
+              <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align: text-bottom; margin-right: 6px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+              <span>GitHub: yoshiki2024/PDF_Studio</span>
+              <i data-lucide="external-link" style="width: 13px; height: 13px; margin-left: 4px;"></i>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW: Merge (結合) -->
+      <section id="view-merge" class="view-panel">
+        <div class="page-header">
+          <div class="page-icon">📑</div>
+          <h1 class="page-title">PDFの結合</h1>
+          <p class="page-description">ドラッグ＆ドロップで順番をスライドして並び替えます。複数選択してブロックのようにまとめて移動することも可能です。</p>
+        </div>
+
+        <div class="merge-toolbar-card">
+          <div class="form-group-inline">
+            <label for="merge-filename">結合後のファイル名:</label>
+            <div class="input-with-addon">
+              <input type="text" id="merge-filename" class="notion-input" value="結合書類_まとめ.pdf">
+            </div>
+          </div>
+          <div class="toolbar-actions">
+            <button class="btn-notion btn-secondary" id="btn-merge-add-more">
+              <i data-lucide="plus"></i> PDFを追加
+            </button>
+            <input type="file" id="merge-add-input" accept=".pdf" multiple class="file-input-hidden">
+            <button class="btn-notion btn-secondary" id="btn-select-all-merge">
+              <i data-lucide="check-square"></i> 全選択
+            </button>
+            <button class="btn-notion btn-primary" id="btn-run-merge">
+              <i data-lucide="folder-output"></i> 出力先を選択して結合を実行
+            </button>
+          </div>
+        </div>
+
+        <div class="notion-callout mb-4">
+          <div class="callout-icon">💡</div>
+          <div class="callout-text">
+            <strong>ヒント:</strong> チェックボックスを複数チェックするか、<code>Shift</code>キーを押しながらクリックすると複数ブロックを選択でき、そのまままとめて別の位置へドラッグ＆ドロップ移動できます。
+          </div>
+        </div>
+
+        <!-- Merge List Container -->
+        <div id="merge-items-container" class="merge-cards-list">
+          <!-- Dynamically inserted cards -->
+        </div>
+      </section>
+
+      <!-- VIEW: Split (分解) -->
+      <section id="view-split" class="view-panel">
+        <div class="page-header">
+          <div class="page-icon">✂️</div>
+          <h1 class="page-title">PDFの分解</h1>
+          <p class="page-description">多ページのPDFを1ページずつ個別のPDFファイルに分解して出力します。ファイル名は個別入力または通し番号で一括設定できます。</p>
+        </div>
+
+        <!-- Split Options Bar -->
+        <div class="split-controls-card">
+          <div class="split-rule-row">
+            <span class="control-label"><i data-lucide="hash"></i> 一括命名ルール:</span>
+            <div class="rule-inputs">
+              <input type="text" id="split-prefix" class="notion-input input-sm" placeholder="プレフィックス (例: 請求書_)" value="分割書類_">
+              <select id="split-digits" class="notion-select select-sm">
+                <option value="1">1桁 (1, 2, 3...)</option>
+                <option value="2">2桁 (01, 02...)</option>
+                <option value="3" selected>3桁 (001, 002...)</option>
+                <option value="4">4桁 (0001, 0002...)</option>
+              </select>
+              <input type="number" id="split-start-num" class="notion-input input-sm" style="width: 80px;" value="1" min="1" title="開始番号">
+              <button class="btn-notion btn-secondary btn-sm" id="btn-apply-split-naming">
+                <i data-lucide="wand-2"></i> 一括適用
+              </button>
+            </div>
+            <div class="rule-actions">
+              <button class="btn-notion btn-primary" id="btn-run-split">
+                <i data-lucide="folder-output"></i> 出力先を選択して分解を実行
+              </button>
+            </div>
+          </div>
+          <div class="split-shortcuts-row">
+            <span class="text-muted">便利選択:</span>
+            <button class="chip-btn" id="btn-split-select-all">すべて選択</button>
+            <button class="chip-btn" id="btn-split-select-odd">奇数ページのみ</button>
+            <button class="chip-btn" id="btn-split-select-even">偶数ページのみ</button>
+            <button class="chip-btn" id="btn-split-deselect-all">選択解除</button>
+          </div>
+        </div>
+
+        <!-- Split Grid Container -->
+        <div id="split-grid-container" class="split-grid">
+          <!-- Dynamically inserted page cards -->
+        </div>
+      </section>
+
+      <!-- VIEW: Rotate (向きの変更) -->
+      <section id="view-rotate" class="view-panel">
+        <div class="page-header">
+          <div class="page-icon">🔄</div>
+          <h1 class="page-title">PDFの向きの変更</h1>
+          <p class="page-description">サムネイルを見ながらページごとに回転できます。斜めスキャンはないため90°刻みで調整し、便利な一括機能も利用可能です。</p>
+        </div>
+
+        <!-- Rotate Toolbar -->
+        <div class="rotate-toolbar-card">
+          <div class="rotate-bulk-actions">
+            <span class="control-label"><i data-lucide="sparkles"></i> 便利な一括回転:</span>
+            <button class="btn-notion btn-secondary btn-sm" id="btn-rotate-all-cw" title="全ページを時計回りに90度回転">
+              <i data-lucide="rotate-cw"></i> 全ページ +90°
+            </button>
+            <button class="btn-notion btn-secondary btn-sm" id="btn-rotate-all-ccw" title="全ページを反時計回りに90度回転">
+              <i data-lucide="rotate-ccw"></i> 全ページ -90°
+            </button>
+            <button class="btn-notion btn-secondary btn-sm" id="btn-rotate-all-180" title="全ページを上下180度反転">
+              <i data-lucide="arrow-up-down"></i> 全ページ 180°反転
+            </button>
+            <button class="btn-notion btn-secondary btn-sm" id="btn-rotate-even-180" title="両面スキャン時の裏面逆さま対策">
+              <i data-lucide="file-text"></i> 偶数ページのみ180°
+            </button>
+            <button class="btn-notion btn-ghost btn-sm" id="btn-rotate-reset" title="回転をすべて0度に戻す">
+              <i data-lucide="refresh-cw"></i> リセット
+            </button>
+          </div>
+          <div class="rotate-save-action">
+            <button class="btn-notion btn-primary" id="btn-run-rotate">
+              <i data-lucide="folder-output"></i> 出力先を選択して保存
+            </button>
+          </div>
+        </div>
+
+        <!-- Rotate Grid Container -->
+        <div id="rotate-grid-container" class="rotate-grid">
+          <!-- Dynamically inserted thumbnails with rotate controls -->
+        </div>
+      </section>
+
+      <!-- VIEW: Edit - Page Select (編集画面: ページ選択) -->
+      <section id="view-edit-select" class="view-panel">
+        <div class="page-header">
+          <div class="page-icon">✏️</div>
+          <h1 class="page-title">編集対象ページの選択</h1>
+          <p class="page-description">編集したいページをクリックしてください。編集は1ページずつ確実に行えます。すべての編集が完了したら下部の「完了」ボタンを押してください。</p>
+        </div>
+
+        <div class="edit-select-bar">
+          <div class="edit-status-info">
+            <span class="status-indicator"></span>
+            <span>現在 <strong><span id="edit-modified-count">0</span></strong> ページが編集済みです</span>
+          </div>
+          <button class="btn-notion btn-primary" id="btn-finish-all-edits">
+            <i data-lucide="check-check"></i> 全ページの編集を完了して確認プレビューへ
+          </button>
+        </div>
+
+        <!-- Page Select Grid -->
+        <div id="edit-select-grid" class="edit-page-grid">
+          <!-- Thumbnails of pages with edit badge -->
+        </div>
+      </section>
+
+      <!-- VIEW: Edit - Single Page Workspace (編集画面: 1ページ詳細編集) -->
+      <section id="view-edit-page" class="view-panel">
+        <div class="edit-workspace-header">
+          <div class="edit-workspace-info">
+            <button class="btn-ghost" id="btn-back-to-page-select">
+              <i data-lucide="arrow-left"></i> ページ選択に戻る
+            </button>
+            <span class="header-divider">|</span>
+            <span class="active-page-title">📄 ページ <span id="current-edit-page-num">1</span> の編集</span>
+          </div>
+          <div class="edit-workspace-actions">
+            <button class="btn-notion btn-secondary" id="btn-cancel-single-edit">キャンセル</button>
+            <button class="btn-notion btn-primary" id="btn-save-single-edit">
+              <i data-lucide="save"></i> このページの編集を完了して戻る
+            </button>
+          </div>
+        </div>
+
+        <div class="edit-studio-layout">
+          <!-- Left: Notion Toolbar -->
+          <aside class="edit-sidebar">
+            <div class="sidebar-section">
+              <div class="sidebar-title"><i data-lucide="wrench"></i> 編集ツール</div>
+              
+              <div class="tool-tabs">
+                <button class="tool-tab active" data-tool="select" id="tool-btn-select">
+                  <i data-lucide="mouse-pointer"></i> 文字選択・編集
+                </button>
+                <button class="tool-tab" data-tool="text" id="tool-btn-text">
+                  <i data-lucide="type"></i> テキスト追加
+                </button>
+                <button class="tool-tab" data-tool="highlight" id="tool-btn-highlight">
+                  <i data-lucide="highlighter"></i> 文字ハイライト
+                </button>
+                <button class="tool-tab" data-tool="redact" id="tool-btn-redact">
+                  <i data-lucide="eraser"></i> 墨消し・白塗り
+                </button>
+                <button class="tool-tab" data-tool="image" id="tool-btn-image">
+                  <i data-lucide="image"></i> 画像埋め込み
+                </button>
+              </div>
+            </div>
+
+            <!-- Context Tool Options: Text Property Box -->
+            <div id="panel-text-options" class="sidebar-section">
+              <div class="sidebar-title"><i data-lucide="sliders"></i> 文字プロパティ</div>
+              
+              <div class="prop-group">
+                <label>テキスト内容:</label>
+                <input type="text" id="active-text-input" class="notion-input" placeholder="文字を選択または入力">
+              </div>
+
+              <div class="prop-group">
+                <label>フォント:</label>
+                <select id="text-font-family" class="notion-select">
+                  <option value="Noto Sans JP, sans-serif">ゴシック体 (Noto Sans)</option>
+                  <option value="'Times New Roman', serif">明朝体・セリフ</option>
+                  <option value="'Courier New', monospace">等幅 (Courier)</option>
+                </select>
+              </div>
+
+              <!-- Style Buttons: Bold, Italic, Color -->
+              <div class="prop-group">
+                <label>スタイル:</label>
+                <div class="style-toggle-buttons">
+                  <button type="button" class="btn-style-toggle" id="btn-toggle-bold" title="太字 (Bold)">
+                    <strong>B</strong>
+                  </button>
+                  <button type="button" class="btn-style-toggle" id="btn-toggle-italic" title="斜体 (Italic)">
+                    <em>I</em>
+                  </button>
+                </div>
+              </div>
+
+              <div class="prop-group">
+                <label>文字サイズ:</label>
+                <div class="size-input-group">
+                  <input type="range" id="text-font-size-range" min="8" max="48" value="14" class="notion-slider">
+                  <span id="text-font-size-val">14px</span>
+                </div>
+              </div>
+
+              <div class="prop-group">
+                <label>文字カラー:</label>
+                <div class="color-palette-presets">
+                  <button class="color-chip active" data-color="#000000" style="background:#000000;" title="黒"></button>
+                  <button class="color-chip" data-color="#EB5757" style="background:#EB5757;" title="赤"></button>
+                  <button class="color-chip" data-color="#2383E2" style="background:#2383E2;" title="青"></button>
+                  <button class="color-chip" data-color="#27AE60" style="background:#27AE60;" title="緑"></button>
+                  <button class="color-chip" data-color="#E8833A" style="background:#E8833A;" title="オレンジ"></button>
+                  <button class="color-chip" data-color="#9B51E0" style="background:#9B51E0;" title="紫"></button>
+                  <input type="color" id="text-color" class="custom-color-input" value="#000000" title="カスタムカラー">
+                </div>
+              </div>
+
+              <div class="prop-group">
+                <label>背景マスク (白塗り隠し):</label>
+                <div class="toggle-group">
+                  <label class="toggle-label">
+                    <input type="checkbox" id="text-bg-mask" checked>
+                    <span>元の文字を白塗りして覆う</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Highlight Panel -->
+            <div id="panel-highlight-options" class="sidebar-section hidden">
+              <div class="sidebar-title"><i data-lucide="highlighter"></i> ハイライト設定</div>
+              <p class="text-sm text-muted">プレビュー画面上の文字（テキスト）をクリックしてハイライトを適用・解除します。</p>
+              <div class="prop-group">
+                <label>マーカー色:</label>
+                <div class="color-palette-presets">
+                  <button class="color-chip active" data-hl-color="#FFF275" style="background:#FFF275;" title="イエロー"></button>
+                  <button class="color-chip" data-hl-color="#D8F8E1" style="background:#85E3A1;" title="グリーン"></button>
+                  <button class="color-chip" data-hl-color="#FCDDEC" style="background:#F694C7;" title="ピンク"></button>
+                  <button class="color-chip" data-hl-color="#D4E8FE" style="background:#7CB9FA;" title="ブルー"></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Redact / Eraser Panel -->
+            <div id="panel-redact-options" class="sidebar-section hidden">
+              <div class="sidebar-title"><i data-lucide="eraser"></i> 墨消し・白塗り設定</div>
+              <p class="text-sm text-muted">プレビュー画面上でドラッグして隠したい範囲を四角く囲みます。</p>
+              <div class="prop-group">
+                <label>マスキング方式:</label>
+                <select id="redact-color" class="notion-select">
+                  <option value="#FFFFFF">白塗り (消去・修正用)</option>
+                  <option value="#000000">黒塗り (機密情報マスキング)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Image Embedding Panel -->
+            <div id="panel-image-options" class="sidebar-section hidden">
+              <div class="sidebar-title"><i data-lucide="image"></i> 画像埋め込み</div>
+              <p class="text-sm text-muted">ロゴ・社印・図表などの画像をPDF上に挿入します。</p>
+              <input type="file" id="image-upload-input" accept="image/*" class="file-input-hidden">
+              <button type="button" class="btn-notion btn-primary" onclick="document.getElementById('image-upload-input').click()">
+                <i data-lucide="upload"></i> 画像ファイルを選択
+              </button>
+            </div>
+
+            <!-- Layer List / Annotations on page -->
+            <div class="sidebar-section flex-grow">
+              <div class="sidebar-title">
+                <span><i data-lucide="layers"></i> このページの編集要素</span>
+                <span class="badge" id="layer-count">0</span>
+              </div>
+              <div id="layer-list" class="layer-list">
+                <p class="text-xs text-muted empty-state-text">編集項目がありません</p>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Right: Canvas & Interactive Preview -->
+          <div class="edit-canvas-viewport" id="canvas-viewport">
+            <div class="canvas-zoom-bar">
+              <button class="btn-icon" id="btn-zoom-out"><i data-lucide="zoom-out"></i></button>
+              <span id="zoom-level-text">100%</span>
+              <button class="btn-icon" id="btn-zoom-in"><i data-lucide="zoom-in"></i></button>
+              <button class="btn-icon" id="btn-zoom-fit" title="画面に合わせる"><i data-lucide="maximize-2"></i></button>
+            </div>
+
+            <div class="canvas-stage" id="canvas-stage">
+              <!-- Rendered PDF Canvas -->
+              <canvas id="pdf-render-canvas"></canvas>
+              <!-- Interactive Text Overlay Layer (for clicking existing text) -->
+              <div id="text-interaction-layer" class="text-interaction-layer"></div>
+              <!-- User Created Elements Layer (Texts, Redactions, Highlights, Images) -->
+              <div id="user-elements-layer" class="user-elements-layer"></div>
+              <!-- Drag Drawing Guide Box -->
+              <div id="drag-guide-box" class="drag-guide-box hidden"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW: Final Preview (完成後イメージプレビュー) -->
+      <section id="view-final-preview" class="view-panel">
+        <div class="page-header">
+          <div class="page-icon">✨</div>
+          <h1 class="page-title">完成後イメージの確認</h1>
+          <p class="page-description">編集が反映された最終プレビューです。仕上がりを確認し、問題なければ出力先を選択してPDFを生成します。修正が必要な場合は戻って再編集できます。</p>
+        </div>
+
+        <div class="final-preview-bar">
+          <button class="btn-notion btn-secondary" id="btn-back-to-edit-select">
+            <i data-lucide="arrow-left"></i> 再度修正する（ページ選択へ）
+          </button>
+          <div class="final-export-actions">
+            <input type="text" id="final-export-filename" class="notion-input" style="width: 260px;" value="編集後書類_完成.pdf">
+            <button class="btn-notion btn-primary" id="btn-run-final-export">
+              <i data-lucide="download"></i> 出力先を選択してPDFを生成
+            </button>
+          </div>
+        </div>
+
+        <!-- Final Preview Carousel / Viewer -->
+        <div class="final-preview-body">
+          <div class="preview-pager">
+            <button class="btn-icon" id="btn-final-prev-page"><i data-lucide="chevron-left"></i></button>
+            <span>ページ <span id="final-current-page">1</span> / <span id="final-total-pages">1</span></span>
+            <button class="btn-icon" id="btn-final-next-page"><i data-lucide="chevron-right"></i></button>
+          </div>
+          <div class="final-preview-canvas-wrapper">
+            <canvas id="final-preview-canvas"></canvas>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Global Toast / Modal for File System Output -->
+    <div id="toast-container" class="toast-container"></div>
+  </div>
+
+  <!-- App Script (file:// でも http:// でも即座に動作可能) -->
+  <script src="js/app.js"></script>
+</body>
+</html>
