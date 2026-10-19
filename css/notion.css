@@ -1233,7 +1233,7 @@ body {
   width: 100%;
   height: 100%;
   pointer-events: auto;
-  z-index: 2;
+  z-index: 4;
 }
 .text-item-box {
   position: absolute;
@@ -1248,6 +1248,7 @@ body {
   transform-origin: 0 0;
   line-height: 1.1;
   transition: border-color 0.1s ease;
+  pointer-events: auto;
 }
 .text-item-box::selection {
   background: rgba(35, 131, 226, 0.45);
@@ -1255,17 +1256,105 @@ body {
 }
 /* 選択・編集ツールの時は薄く枠線を表示してクリック位置が分かるようにする */
 .text-interaction-layer.select-mode .text-item-box {
-  border: 1px solid rgba(35, 131, 226, 0.18);
-  background-color: rgba(35, 131, 226, 0.02);
+  border: 1px solid rgba(35, 131, 226, 0.12);
+  background-color: rgba(35, 131, 226, 0.01);
 }
 .text-interaction-layer.select-mode .text-item-box:hover {
-  background-color: rgba(35, 131, 226, 0.15);
+  background-color: rgba(35, 131, 226, 0.12);
   border-color: var(--notion-blue);
 }
 .text-item-box.selected {
   background-color: rgba(35, 131, 226, 0.25);
   border: 2px solid var(--notion-blue);
 }
+
+/* Embedded Image Interaction Layer & Box */
+.image-interaction-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none !important; /* コンテナ全体は常にマウスを素通りさせて文字選択を妨げない */
+  z-index: 3;
+}
+.image-item-box {
+  position: absolute;
+  border: 2px dashed rgba(121, 82, 179, 0.45);
+  background-color: rgba(121, 82, 179, 0.05);
+  cursor: grab;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+  user-select: none;
+  touch-action: none;
+  pointer-events: auto; /* 画像ボックスそのもののみマウスイベントを受け付ける */
+}
+/* 選択・編集モード以外の時は画像ボックスを非表示にして他のツールの邪魔をしない */
+.image-interaction-layer:not(.select-mode) .image-item-box {
+  display: none !important;
+}
+.image-item-box:hover {
+  border: 2px solid #7952B3;
+  background-color: rgba(121, 82, 179, 0.18);
+  box-shadow: 0 2px 8px rgba(121, 82, 179, 0.25);
+}
+.image-item-box.selected {
+  border: 2px solid #6f42c1;
+  background-color: rgba(121, 82, 179, 0.25);
+  box-shadow: 0 0 10px rgba(111, 66, 193, 0.45);
+}
+.image-item-badge {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  background: #6f42c1;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  pointer-events: none;
+  opacity: 0.85;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+.image-item-badge i {
+  width: 11px;
+  height: 11px;
+}
+.btn-quick-img-delete {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #E03E3E;
+  color: #FFFFFF;
+  border: 2px solid #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+  z-index: 10;
+}
+.image-item-box:hover .btn-quick-img-delete,
+.image-item-box.selected .btn-quick-img-delete {
+  opacity: 1;
+}
+.btn-quick-img-delete:hover {
+  transform: scale(1.15);
+  background: #C92A2A;
+}
+
 
 /* User Elements Layer */
 .user-elements-layer {
@@ -1275,7 +1364,7 @@ body {
   width: 100%;
   height: 100%;
   pointer-events: none; /* 下の文字選択にマウスを通過させる */
-  z-index: 3;
+  z-index: 5;
 }
 .user-el {
   position: absolute;
@@ -1315,13 +1404,33 @@ body {
   opacity: 1.0;
   z-index: 3;
 }
-.user-highlight-el {
-  mix-blend-mode: multiply;
-  opacity: 0.55;
-  z-index: 1 !important;
-  border-radius: 2px;
+
+/* Highlight Elements Layer (Individual Multiply Blending to match PDF output) */
+.highlight-elements-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
+  z-index: auto; /* スタッキングコンテキストを形成せず、直下のCanvasと各矩形が個別に乗算合成 */
 }
+.user-highlight-el {
+  position: absolute;
+  border-radius: 3px;
+  mix-blend-mode: multiply; /* 個々のハイライト矩形ごとに直接乗算合成！重ね掛け時もPDFと同一の深まり */
+  opacity: 0.85; /* PDF出力時のopacityと完全一致させて色合いを100%同期 */
+  z-index: 1;
+  pointer-events: auto;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: box-shadow 0.15s ease, outline 0.15s ease;
+}
+.user-highlight-el.selected {
+  outline: 2px solid var(--notion-blue);
+  box-shadow: 0 0 6px rgba(35, 131, 226, 0.4);
+}
+
 /* Quick Highlight Popup */
 .quick-highlight-popup {
   position: absolute;
@@ -1726,4 +1835,64 @@ body {
 .font-picker-select:focus {
   border-color: var(--notion-blue);
   box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.2);
+}
+
+/* Floating Font Suggestions Dropdown (最前面ポップアップ) */
+.font-suggestions-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #FFFFFF;
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.08);
+  max-height: 250px;
+  overflow-y: auto;
+  z-index: 1000;
+  padding: 4px 0;
+}
+.font-suggestions-dropdown.hidden {
+  display: none !important;
+}
+.font-sugg-group-title {
+  padding: 6px 10px 3px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--notion-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #F9FAFB;
+  border-bottom: 1px solid #F0F0F0;
+  margin-top: 4px;
+}
+.font-sugg-group-title:first-child {
+  margin-top: 0;
+}
+.font-sugg-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--notion-text);
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+  user-select: none;
+}
+.font-sugg-item:hover, .font-sugg-item.active {
+  background-color: rgba(35, 131, 226, 0.1);
+  color: var(--notion-blue);
+  font-weight: 500;
+}
+.font-sugg-item.selected {
+  background-color: rgba(35, 131, 226, 0.15);
+  color: var(--notion-blue);
+  font-weight: 600;
+}
+.font-sugg-empty {
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--notion-text-muted);
+  text-align: center;
 }

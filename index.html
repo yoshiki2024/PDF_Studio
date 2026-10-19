@@ -420,6 +420,8 @@
                   <i data-lucide="search" class="font-search-icon"></i>
                   <input type="text" id="font-search-input" class="notion-input font-search-input" placeholder="🔍 絞り込み検索 / 直接入力 (Enter適用)" autocomplete="off">
                   <button type="button" id="btn-font-search-clear" class="btn-clear-search hidden" title="検索解除">×</button>
+                  <!-- 最前面レイヤーに浮遊表示される候補一覧ポップアップ -->
+                  <div id="font-suggestions-dropdown" class="font-suggestions-dropdown hidden"></div>
                 </div>
 
                 <!-- フォント選択セレクトボックス（常時表示・絞り込み連動） -->
@@ -520,10 +522,10 @@
               <div class="prop-group">
                 <label>マーカー色:</label>
                 <div class="color-palette-presets">
-                  <button class="color-chip active" data-hl-color="#FFF275" style="background:#FFF275;" title="イエロー"></button>
-                  <button class="color-chip" data-hl-color="#D8F8E1" style="background:#85E3A1;" title="グリーン"></button>
-                  <button class="color-chip" data-hl-color="#FCDDEC" style="background:#F694C7;" title="ピンク"></button>
-                  <button class="color-chip" data-hl-color="#D4E8FE" style="background:#7CB9FA;" title="ブルー"></button>
+                  <button class="color-chip active" data-hl-color="#FFE600" style="background:#FFE600;" title="蛍光イエロー (Adobe標準)"></button>
+                  <button class="color-chip" data-hl-color="#53FF46" style="background:#53FF46;" title="蛍光グリーン"></button>
+                  <button class="color-chip" data-hl-color="#FF6EB4" style="background:#FF6EB4;" title="蛍光ピンク"></button>
+                  <button class="color-chip" data-hl-color="#48CAE4" style="background:#48CAE4;" title="蛍光スカイブルー"></button>
                 </div>
               </div>
             </div>
@@ -575,9 +577,13 @@
             <div class="canvas-stage" id="canvas-stage">
               <!-- Rendered PDF Canvas -->
               <canvas id="pdf-render-canvas"></canvas>
+              <!-- Highlight Elements Layer (Directly blends with Canvas via multiply!) -->
+              <div id="highlight-elements-layer" class="highlight-elements-layer"></div>
+              <!-- Interactive Image Overlay Layer (for embedded logos & images) -->
+              <div id="image-interaction-layer" class="image-interaction-layer"></div>
               <!-- Interactive Text Overlay Layer (for clicking existing text) -->
               <div id="text-interaction-layer" class="text-interaction-layer"></div>
-              <!-- User Created Elements Layer (Texts, Redactions, Highlights, Images) -->
+              <!-- User Created Elements Layer (Texts, Redactions, Images) -->
               <div id="user-elements-layer" class="user-elements-layer"></div>
               <!-- Drag Drawing Guide Box -->
               <div id="drag-guide-box" class="drag-guide-box hidden"></div>
@@ -588,10 +594,10 @@
                   <span>ハイライト</span>
                 </button>
                 <div class="quick-hl-colors">
-                  <button type="button" class="quick-color-dot active" data-hl-color="#FFF275" style="background:#FFF275;" title="イエロー"></button>
-                  <button type="button" class="quick-color-dot" data-hl-color="#D8F8E1" style="background:#85E3A1;" title="グリーン"></button>
-                  <button type="button" class="quick-color-dot" data-hl-color="#FCDDEC" style="background:#F694C7;" title="ピンク"></button>
-                  <button type="button" class="quick-color-dot" data-hl-color="#D4E8FE" style="background:#7CB9FA;" title="ブルー"></button>
+                  <button type="button" class="quick-color-dot active" data-hl-color="#FFE600" style="background:#FFE600;" title="蛍光イエロー"></button>
+                  <button type="button" class="quick-color-dot" data-hl-color="#53FF46" style="background:#53FF46;" title="蛍光グリーン"></button>
+                  <button type="button" class="quick-color-dot" data-hl-color="#FF6EB4" style="background:#FF6EB4;" title="蛍光ピンク"></button>
+                  <button type="button" class="quick-color-dot" data-hl-color="#48CAE4" style="background:#48CAE4;" title="蛍光スカイブルー"></button>
                 </div>
               </div>
             </div>

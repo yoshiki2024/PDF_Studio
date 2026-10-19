@@ -4,6 +4,158 @@ if (window.pdfjsLib) {
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
+/**
+ * PDFのフォントメタデータから、利用可能なフォントファミリ・太字・斜体を高精度に判別
+ */
+function detectMatchingFont(item, textContent, page) {
+  try {
+    const candidates = [];
+
+    // 1. item.fontName
+    if (item && item.fontName) candidates.push(item.fontName);
+
+    // 2. textContent.styles[item.fontName]
+    if (textContent && textContent.styles && item && item.fontName && textContent.styles[item.fontName]) {
+      const s = textContent.styles[item.fontName];
+      if (s && s.fontFamily) candidates.push(s.fontFamily);
+    }
+
+    // 3. page.commonObjs
+    try {
+      if (page && page.commonObjs && typeof page.commonObjs.has === 'function' && page.commonObjs.has(item.fontName)) {
+        const fObj = page.commonObjs.get(item.fontName);
+        if (fObj) {
+          if (fObj.name) candidates.push(fObj.name);
+          if (fObj.loadedName) candidates.push(fObj.loadedName);
+          if (fObj.fallbackName) candidates.push(fObj.fallbackName);
+        }
+      }
+    } catch (e) {}
+
+    let isBold = false;
+    let isItalic = false;
+
+    // 太字・斜体判定
+    for (const c of candidates) {
+      if (typeof c === 'string') {
+        if (/bold|black|heavy|w[6-9]|semibold/i.test(c)) isBold = true;
+        if (/italic|oblique/i.test(c)) isItalic = true;
+      }
+    }
+
+    // サブセット接頭辞 (例: "BCDFEE+MS-PGothic" -> "MS-PGothic") を除去してクリーニング
+    const cleanCandidates = candidates
+      .filter(c => typeof c === 'string')
+      .map(c => c.replace(/^[A-Za-z0-9]{6}\+/, '').trim());
+
+    // フォント定義マッピング（代表的な日本語・英数フォント）
+    const fontRules = [
+      // 游ゴシック
+      { regex: /yugothic|yu-gothic|游ゴシック/i, value: "'Yu Gothic', '游ゴシック', sans-serif" },
+      // メイリオ
+      { regex: /meiryo|メイリオ/i, value: "'Meiryo', 'メイリオ', sans-serif" },
+      // ＭＳ Ｐゴシック
+      { regex: /ms-?p-?gothic|ｍｓ\s*ｐゴシック/i, value: "'MS PGothic', 'ＭＳ Ｐゴシック', sans-serif" },
+      // ＭＳ ゴシック (等幅)
+      { regex: /ms-?gothic|ｍｓ\s*ゴシック/i, value: "'MS Gothic', 'ＭＳ ゴシック', monospace" },
+      // BIZ UDPゴシック
+      { regex: /biz-?ud-?pgothic|biz\s*udpゴシック/i, value: "'BIZ UDPGothic', 'BIZ UDPゴシック', sans-serif" },
+      // BIZ UDゴシック
+      { regex: /biz-?ud-?gothic|biz\s*udゴシック/i, value: "'BIZ UDPGothic', 'BIZ UDPゴシック', sans-serif" },
+      // ヒラギノ角ゴ
+      { regex: /hiragino|ヒラギノ/i, value: "'Hiragino Sans', 'ヒラギノ角ゴ', sans-serif" },
+      // Noto Sans JP
+      { regex: /notosansjp|noto-sans-jp|notosans/i, value: "'Noto Sans JP', sans-serif" },
+      // 游明朝
+      { regex: /yumincho|yu-mincho|游明朝/i, value: "'Yu Mincho', '游明朝', serif" },
+      // ＭＳ Ｐ明朝
+      { regex: /ms-?p-?mincho|ｍｓ\s*ｐ明朝/i, value: "'MS PMincho', 'ＭＳ Ｐ明朝', serif" },
+      // ＭＳ 明朝
+      { regex: /ms-?mincho|ｍｓ\s*明朝/i, value: "'MS PMincho', 'ＭＳ Ｐ明朝', serif" },
+      // BIZ UDP明朝
+      { regex: /biz-?ud-?p?mincho|biz\s*udp?明朝/i, value: "'BIZ UDPMincho', 'BIZ UDP明朝', serif" },
+      // Noto Serif JP
+      { regex: /notoserifjp|noto-serif-jp|notoserif/i, value: "'Noto Serif JP', serif" },
+      // Roboto Mono
+      { regex: /robotomono|roboto-mono/i, value: "'Roboto Mono', monospace" },
+      // Consolas
+      { regex: /consolas/i, value: "'Consolas', monospace" },
+      // Courier New / Courier
+      { regex: /courier/i, value: "'Courier New', monospace" },
+      // Arial
+      { regex: /arial/i, value: "'Arial', sans-serif" },
+      // Helvetica
+      { regex: /helvetica/i, value: "'Helvetica', sans-serif" },
+      // Times New Roman
+      { regex: /timesnewroman|times-roman|times/i, value: "'Times New Roman', serif" },
+      // Georgia
+      { regex: /georgia/i, value: "'Georgia', serif" },
+      // Inter
+      { regex: /inter/i, value: "'Inter', sans-serif" }
+    ];
+
+    for (const name of cleanCandidates) {
+      for (const rule of fontRules) {
+        if (rule.regex.test(name)) {
+          return {
+            fontFamily: rule.value,
+            bold: isBold,
+            italic: isItalic,
+            rawName: name
+          };
+        }
+      }
+    }
+
+    // アプリ内のセレクトボックス内のoptionやPCから読み込んだローカルフォント一覧（fontMasterGroups）との照合
+    if (typeof fontMasterGroups !== 'undefined' && fontMasterGroups && fontMasterGroups.length > 0) {
+      for (const name of cleanCandidates) {
+        const lower = name.toLowerCase();
+        for (const grp of fontMasterGroups) {
+          for (const opt of grp.options) {
+            const optLower = opt.text.toLowerCase();
+            const valLower = opt.value.toLowerCase();
+            if (lower.includes(optLower) || optLower.includes(lower) || valLower.includes(lower)) {
+              return {
+                fontFamily: opt.value,
+                bold: isBold,
+                italic: isItalic,
+                rawName: name
+              };
+            }
+          }
+        }
+      }
+    }
+
+    // カテゴリによるフォールバック
+    for (const name of cleanCandidates) {
+      const lower = name.toLowerCase();
+      if (/mincho|serif|明朝|kozmin|song|batang|sung/i.test(lower)) {
+        return { fontFamily: "'Noto Serif JP', serif", bold: isBold, italic: isItalic, rawName: name };
+      }
+      if (/mono|code|courier|typewriter/i.test(lower)) {
+        return { fontFamily: "'Roboto Mono', monospace", bold: isBold, italic: isItalic, rawName: name };
+      }
+    }
+
+    return {
+      fontFamily: "'Noto Sans JP', sans-serif",
+      bold: isBold,
+      italic: isItalic,
+      rawName: cleanCandidates[0] || ''
+    };
+  } catch (err) {
+    console.warn('detectMatchingFont error fallback:', err);
+    return {
+      fontFamily: "'Noto Sans JP', sans-serif",
+      bold: false,
+      italic: false,
+      rawName: ''
+    };
+  }
+}
+
 class PDFEngine {
   constructor() {
     this.pdfLib = window.PDFLib;
@@ -77,26 +229,220 @@ class PDFEngine {
       if (!item.str || item.str.trim() === '') continue;
 
       const tx = this.pdfjs.Util.transform(viewport.transform, item.transform);
-      const fontSize = Math.sqrt(tx[0] * tx[0] + tx[1] * tx[1]);
+      // Y方向（垂直・高さ方向）のスケールが本来のフォント名目サイズ
+      const fontHeight = Math.hypot(tx[2], tx[3]);
+      const fontWidth = Math.hypot(tx[0], tx[1]);
+      const nominalFontSize = fontHeight > 0 ? fontHeight : fontWidth;
       
-      const x = tx[4];
-      const y = tx[5] - fontSize;
       const width = item.width * scale;
-      const height = item.height ? item.height * scale : fontSize * 1.2;
+      // item.height があれば実寸高さ、なければ名目サイズ×0.9
+      const height = item.height ? item.height * scale : nominalFontSize * 0.9;
+      const x = tx[4];
+      const y = tx[5] - height;
 
-      items.push({
+      // 元フォントの自動判別（PostScript名・スタイル・太字・斜体）
+      const detectedFont = detectMatchingFont(item, textContent, page);
+
+      const rawItem = {
         str: item.str,
         x: Math.max(0, x),
         y: Math.max(0, y),
         width: Math.max(width, 10),
         height: Math.max(height, 12),
-        fontSize,
-        fontName: item.fontName
-      });
+        fontSize: nominalFontSize,
+        fontName: item.fontName,
+        detectedFont
+      };
+
+      // プレビュー画面上に表示されている文字の実寸フォントサイズを正確に計算してセット
+      rawItem.fontSize = getTextItemFontSize(rawItem);
+      items.push(rawItem);
     }
 
     return items;
   }
+
+  /**
+   * PDFページから埋め込まれている画像（ロゴ、写真、印鑑等）の位置とデータを抽出
+   */
+  async extractImageItems(pdfJsDoc, pageNum, scale = 1.0, renderedCanvas = null) {
+    try {
+      const page = await pdfJsDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale });
+      const opList = await page.getOperatorList();
+      const OPS = window.pdfjsLib ? window.pdfjsLib.OPS : null;
+      if (!OPS) return [];
+
+      let currentTransform = [1, 0, 0, 1, 0, 0];
+      const transformStack = [];
+      const imageItems = [];
+
+      for (let i = 0; i < opList.fnArray.length; i++) {
+        const fn = opList.fnArray[i];
+        const args = opList.argsArray[i];
+
+        if (fn === OPS.save) {
+          transformStack.push([...currentTransform]);
+        } else if (fn === OPS.restore) {
+          if (transformStack.length > 0) {
+            currentTransform = transformStack.pop();
+          }
+        } else if (fn === OPS.transform) {
+          currentTransform = [
+            currentTransform[0] * args[0] + currentTransform[2] * args[1],
+            currentTransform[1] * args[0] + currentTransform[3] * args[1],
+            currentTransform[0] * args[2] + currentTransform[2] * args[3],
+            currentTransform[1] * args[2] + currentTransform[3] * args[3],
+            currentTransform[0] * args[4] + currentTransform[2] * args[5] + currentTransform[4],
+            currentTransform[1] * args[4] + currentTransform[3] * args[5] + currentTransform[5]
+          ];
+        } else if (fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject || fn === OPS.paintImageMaskXObject) {
+          const imgKey = args ? args[0] : null;
+
+          // PDF.js Util.transform で viewport と合成
+          const tx = this.pdfjs.Util.transform(viewport.transform, currentTransform);
+
+          // PDFの画像空間 [0,0] 〜 [1,1] の4頂点をキャンバス座標へ変換
+          const p1 = this.pdfjs.Util.applyTransform([0, 0], tx);
+          const p2 = this.pdfjs.Util.applyTransform([1, 0], tx);
+          const p3 = this.pdfjs.Util.applyTransform([0, 1], tx);
+          const p4 = this.pdfjs.Util.applyTransform([1, 1], tx);
+
+          const minX = Math.min(p1[0], p2[0], p3[0], p4[0]);
+          const maxX = Math.max(p1[0], p2[0], p3[0], p4[0]);
+          const minY = Math.min(p1[1], p2[1], p3[1], p4[1]);
+          const maxY = Math.max(p1[1], p2[1], p3[1], p4[1]);
+
+          const width = maxX - minX;
+          const height = maxY - minY;
+          const x = minX;
+          const y = minY;
+
+          // 微小なノイズ画像（線や1pxドット）や、ページ全体に及ぶ巨大背景画像は除外
+          if (width < 8 || height < 8) continue;
+          if (width >= viewport.width * 0.98 && height >= viewport.height * 0.98) continue;
+
+          // 画像データの取得
+          let dataUrl = null;
+          try {
+            if (typeof imgKey === 'string' && page.objs && page.objs.has(imgKey)) {
+              const imgObj = page.objs.get(imgKey);
+              dataUrl = this.convertPdfImageToDataUrl(imgObj);
+            }
+          } catch (objErr) {
+            console.warn('PDF image obj extract notice:', objErr);
+          }
+
+          // フォールバック: レンダリング済みキャンバスの該当矩形から高画質切り抜き
+          if (!dataUrl && renderedCanvas) {
+            dataUrl = this.cropCanvasToDataUrl(renderedCanvas, x, y, width, height);
+          }
+
+          if (dataUrl) {
+            imageItems.push({
+              id: `pdf-img-${pageNum}-${imageItems.length}`,
+              imgKey: typeof imgKey === 'string' ? imgKey : `inline-${imageItems.length}`,
+              x: Math.round(x),
+              y: Math.round(y),
+              width: Math.round(width),
+              height: Math.round(height),
+              dataUrl,
+              origX: Math.round(x),
+              origY: Math.round(y),
+              origWidth: Math.round(width),
+              origHeight: Math.round(height)
+            });
+          }
+        }
+      }
+
+      return imageItems;
+    } catch (e) {
+      console.error('Failed to extract image items:', e);
+      return [];
+    }
+  }
+
+  /**
+   * PDF.js の内部画像オブジェクトを PNG データURL に変換
+   */
+  convertPdfImageToDataUrl(imgObj) {
+    if (!imgObj) return null;
+    try {
+      const width = imgObj.width;
+      const height = imgObj.height;
+      if (!width || !height) return null;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+
+      if (imgObj.bitmap) {
+        ctx.drawImage(imgObj.bitmap, 0, 0);
+        return canvas.toDataURL('image/png');
+      }
+      if (typeof ImageBitmap !== 'undefined' && imgObj instanceof ImageBitmap) {
+        ctx.drawImage(imgObj, 0, 0);
+        return canvas.toDataURL('image/png');
+      }
+      if (imgObj.data) {
+        const imgData = ctx.createImageData(width, height);
+        const dataLen = imgObj.data.length;
+        if (dataLen === width * height * 4) {
+          imgData.data.set(imgObj.data);
+        } else if (dataLen === width * height * 3) {
+          let s = 0, d = 0;
+          for (let i = 0; i < width * height; i++) {
+            imgData.data[d] = imgObj.data[s];
+            imgData.data[d + 1] = imgObj.data[s + 1];
+            imgData.data[d + 2] = imgObj.data[s + 2];
+            imgData.data[d + 3] = 255;
+            s += 3; d += 4;
+          }
+        } else if (dataLen === width * height) {
+          let s = 0, d = 0;
+          for (let i = 0; i < width * height; i++) {
+            const v = imgObj.data[s++];
+            imgData.data[d] = v;
+            imgData.data[d + 1] = v;
+            imgData.data[d + 2] = v;
+            imgData.data[d + 3] = 255;
+            d += 4;
+          }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        return canvas.toDataURL('image/png');
+      }
+    } catch (err) {
+      console.warn('convertPdfImageToDataUrl error:', err);
+    }
+    return null;
+  }
+
+  /**
+   * レンダリング済みキャンバスから該当エリアを高精度に切り抜いて PNG データURL を生成
+   */
+  cropCanvasToDataUrl(canvas, x, y, width, height) {
+    try {
+      const cropW = Math.max(1, Math.round(width));
+      const cropH = Math.max(1, Math.round(height));
+      const cropCanvas = document.createElement('canvas');
+      cropCanvas.width = cropW;
+      cropCanvas.height = cropH;
+      const ctx = cropCanvas.getContext('2d');
+      const srcX = Math.max(0, Math.min(canvas.width - 1, Math.round(x)));
+      const srcY = Math.max(0, Math.min(canvas.height - 1, Math.round(y)));
+      const srcW = Math.min(canvas.width - srcX, cropW);
+      const srcH = Math.min(canvas.height - srcY, cropH);
+      ctx.drawImage(canvas, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+      return cropCanvas.toDataURL('image/png');
+    } catch (e) {
+      console.warn('cropCanvasToDataUrl failed:', e);
+      return null;
+    }
+  }
+
 
   async mergeDocuments(docList) {
     const mergedPdf = await this.pdfLib.PDFDocument.create();
@@ -156,7 +502,7 @@ class PDFEngine {
       const page = pages[i];
       const { width, height } = page.getSize();
 
-      // 1. ハイライトを最背面（テキストの背面）に描画
+      // 1. 個々のハイライト矩形を1個ずつPDFに乗算（Multiply）描画
       const highlights = edits.filter(e => e.type === 'highlight');
       for (const edit of highlights) {
         const scaleX = width / edit.canvasWidth;
@@ -165,21 +511,25 @@ class PDFEngine {
         const pdfY = height - (edit.y * scaleY) - (edit.height * scaleY);
         const pdfWidth = edit.width * scaleX;
         const pdfHeight = edit.height * scaleY;
-        const rgb = this.hexToRgb(edit.color || '#FFF275');
-        page.drawRectangle({
+        const rgb = this.hexToRgb(edit.color || '#FFE600');
+        const drawOpts = {
           x: pdfX,
           y: pdfY,
           width: pdfWidth,
           height: pdfHeight,
           color: this.pdfLib.rgb(rgb.r / 255, rgb.g / 255, rgb.b / 255),
-          opacity: 0.45,
+          opacity: 0.85, // プレビューの opacity: 0.85 と完全一致
           borderWidth: 0
-        });
+        };
+        if (this.pdfLib.BlendMode && this.pdfLib.BlendMode.Multiply) {
+          drawOpts.blendMode = this.pdfLib.BlendMode.Multiply;
+        }
+        page.drawRectangle(drawOpts);
       }
 
-      // 2. 移動されたテキストの「元位置の白塗りマスク」を描画（二重表示の完全防止！）
+      // 2. 移動されたテキスト・画像の「元位置の白塗りマスク」を描画（二重表示の完全防止！）
       for (const edit of edits) {
-        if (edit.type === 'text' && edit.origX !== undefined && (Math.abs(edit.x - edit.origX) > 2 || Math.abs(edit.y - edit.origY) > 2)) {
+        if ((edit.type === 'text' || edit.type === 'image') && edit.origX !== undefined && (Math.abs(edit.x - edit.origX) > 2 || Math.abs(edit.y - edit.origY) > 2)) {
           const scaleX = width / edit.canvasWidth;
           const scaleY = height / edit.canvasHeight;
           const pdfOrigX = edit.origX * scaleX - 1;
@@ -358,7 +708,7 @@ const state = {
     italic: false,
     maskBg: true
   },
-  activeHighlightColor: '#FFF275',
+  activeHighlightColor: '#FFE600',
   zoomLevel: 1.0,
   finalPreviewPage: 1,
   undoStack: [],
@@ -451,6 +801,7 @@ const dom = {
   textFontFamily: document.getElementById('text-font-family'),
   fontSearchInput: document.getElementById('font-search-input'),
   btnFontSearchClear: document.getElementById('btn-font-search-clear'),
+  fontSuggestionsDropdown: document.getElementById('font-suggestions-dropdown'),
   fontCountBadge: document.getElementById('font-count-badge'),
   textFontSizeRange: document.getElementById('text-font-size-range'),
   textFontSizeVal: document.getElementById('text-font-size-val'),
@@ -466,7 +817,9 @@ const dom = {
   canvasStage: document.getElementById('canvas-stage'),
   dragGuideBox: document.getElementById('drag-guide-box'),
   pdfRenderCanvas: document.getElementById('pdf-render-canvas'),
+  highlightElementsLayer: document.getElementById('highlight-elements-layer'),
   textInteractionLayer: document.getElementById('text-interaction-layer'),
+  imageInteractionLayer: document.getElementById('image-interaction-layer'),
   userElementsLayer: document.getElementById('user-elements-layer'),
   btnApplySelectionHighlight: document.getElementById('btn-apply-selection-highlight'),
   quickHighlightPopup: document.getElementById('quick-highlight-popup'),
@@ -1406,6 +1759,120 @@ function initFontMasterData() {
   });
 }
 
+function closeFontSuggestions() {
+  if (dom.fontSuggestionsDropdown) {
+    dom.fontSuggestionsDropdown.classList.add('hidden');
+    dom.fontSuggestionsDropdown.innerHTML = '';
+  }
+}
+
+function selectFontFamily(fontValue, fontName = '') {
+  state.activeTextProp.fontFamily = fontValue;
+  if (dom.textFontFamily) {
+    dom.textFontFamily.value = fontValue;
+  }
+  if (dom.fontSearchInput) {
+    dom.fontSearchInput.value = '';
+  }
+  const clearBtn = dom.btnFontSearchClear;
+  if (clearBtn) clearBtn.classList.add('hidden');
+
+  closeFontSuggestions();
+
+  // ネイティブセレクトボックスも通常表示にリセット
+  renderFontSelectOptions(fontValue, '');
+
+  // 選択中のテキスト要素に即座に反映
+  let selected = (state.pageEdits[state.currentEditPage] || []).find(el => el.id === state.selectedElementId);
+  if (!selected && state.selectedTextItem) {
+    selected = ensureTextEditElement(state.selectedTextItem);
+    state.selectedElementId = selected.id;
+  }
+  if (selected && selected.type === 'text') {
+    pushHistoryState();
+    selected.fontFamily = fontValue;
+    renderUserElements();
+  }
+
+  showToast(`フォント「${fontName || fontValue}」を適用しました`, 'success');
+}
+
+function renderFontSuggestions(query) {
+  const dropdown = dom.fontSuggestionsDropdown;
+  if (!dropdown) return;
+
+  const q = (query || '').trim().toLowerCase();
+  if (!q) {
+    closeFontSuggestions();
+    return;
+  }
+
+  if (fontMasterGroups.length === 0) {
+    initFontMasterData();
+  }
+
+  dropdown.innerHTML = '';
+  let matchCount = 0;
+  let firstItem = null;
+
+  fontMasterGroups.forEach(grp => {
+    const matchedOpts = grp.options.filter(opt => 
+      opt.text.toLowerCase().includes(q) || opt.value.toLowerCase().includes(q)
+    );
+
+    if (matchedOpts.length > 0) {
+      const titleEl = document.createElement('div');
+      titleEl.className = 'font-sugg-group-title';
+      titleEl.textContent = grp.label;
+      dropdown.appendChild(titleEl);
+
+      matchedOpts.forEach(opt => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'font-sugg-item';
+        itemEl.dataset.value = opt.value;
+        itemEl.dataset.text = opt.text;
+        itemEl.style.fontFamily = opt.value;
+
+        const isCurrent = (state.activeTextProp.fontFamily === opt.value) || 
+                          (dom.textFontFamily && dom.textFontFamily.value === opt.value);
+        if (isCurrent) {
+          itemEl.classList.add('selected');
+        }
+
+        itemEl.innerHTML = `<span>${opt.text}</span>`;
+        if (isCurrent) {
+          itemEl.innerHTML += `<span style="font-size: 11px; opacity: 0.7;">✓ 選択中</span>`;
+        }
+
+        itemEl.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          selectFontFamily(opt.value, opt.text);
+        });
+
+        dropdown.appendChild(itemEl);
+        matchCount++;
+        if (!firstItem) firstItem = itemEl;
+      });
+    }
+  });
+
+  if (matchCount === 0) {
+    const emptyEl = document.createElement('div');
+    emptyEl.className = 'font-sugg-empty';
+    emptyEl.innerHTML = `一致するフォントがありません<br><span style="font-size: 10px; color: var(--notion-blue); cursor: pointer; text-decoration: underline;">[Enter] で「${query}」を手動指定フォントとして追加</span>`;
+    emptyEl.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      applyCustomFontDirect(query);
+      closeFontSuggestions();
+    });
+    dropdown.appendChild(emptyEl);
+  } else if (firstItem) {
+    firstItem.classList.add('active');
+  }
+
+  dropdown.classList.remove('hidden');
+}
+
 function renderFontSelectOptions(currentVal = null, query = '') {
   const select = dom.textFontFamily;
   if (!select) return { matchCount: 0, firstMatchedOpt: null };
@@ -1460,13 +1927,6 @@ function renderFontSelectOptions(currentVal = null, query = '') {
     firstMatchedOpt.selected = true;
   }
 
-  // 検索クエリがある時は候補をダイレクトに選びやすいようリスト展開（size属性）
-  if (q && matchCount > 0) {
-    select.size = Math.min(6, Math.max(2, matchCount));
-  } else {
-    select.removeAttribute('size');
-  }
-
   return { matchCount, firstMatchedOpt };
 }
 
@@ -1476,7 +1936,8 @@ function filterFontSelect(query) {
   if (clearBtn) {
     clearBtn.classList.toggle('hidden', !q);
   }
-  return renderFontSelectOptions(null, q);
+  renderFontSelectOptions(null, q);
+  renderFontSuggestions(q);
 }
 
 function applyCustomFontDirect(fontName) {
@@ -1506,6 +1967,7 @@ function applyCustomFontDirect(fontName) {
     filterFontSelect('');
     select.value = matchedVal;
     state.activeTextProp.fontFamily = matchedVal;
+    closeFontSuggestions();
     showToast(`フォント「${matchedText}」を適用しました`, 'success');
   } else {
     // 完全新規の手動指定フォントとしてマスターデータの先頭に追加
@@ -1527,6 +1989,7 @@ function applyCustomFontDirect(fontName) {
     filterFontSelect('');
     select.value = customVal;
     state.activeTextProp.fontFamily = customVal;
+    closeFontSuggestions();
     showToast(`手動指定フォント「${cleanName}」を適用しました`, 'success');
   }
 
@@ -1594,11 +2057,14 @@ async function loadLocalPcFonts() {
 }
 
 let currentTextItems = [];
+let currentImageItems = [];
+let selectedEmbeddedImage = null;
 let activeInlineEditor = null;
 
 async function openSinglePageEditor(pageNum) {
   state.currentEditPage = pageNum;
   dom.currentEditPageNum.textContent = pageNum;
+  selectedEmbeddedImage = null;
 
   // ページ初期化時に履歴スタックを初期化
   state.undoStack = [];
@@ -1633,14 +2099,218 @@ async function renderEditCanvas(pageNum) {
   dom.canvasStage.style.width = `${viewport.width}px`;
   dom.canvasStage.style.height = `${viewport.height}px`;
 
-  // Extract texts for click-to-edit
+  // 1. テキスト抽出（クリック＆ダブルクリック編集用）
   currentTextItems = await pdfEngine.extractTextItems(doc.pdfJsDoc, pageNum, scale);
   renderTextInteractionLayer(currentTextItems);
 
-  // Render user created edits (text overlays, redactions, stamps)
+  // 2. 埋め込み画像・ロゴ抽出（移動＆消去用）
+  currentImageItems = await pdfEngine.extractImageItems(doc.pdfJsDoc, pageNum, scale, canvas);
+  renderImageInteractionLayer(currentImageItems);
+
+  // 3. ユーザー作成編集要素（テキスト、白塗り、移動画像等）を描画
   renderUserElements();
   updateLayerList();
 }
+
+function renderImageInteractionLayer(imageItems) {
+  let container = dom.imageInteractionLayer || document.getElementById('image-interaction-layer');
+  if (!container) return;
+  container.innerHTML = '';
+  container.classList.toggle('select-mode', state.activeTool === 'select');
+  container.style.pointerEvents = 'none';
+
+  const edits = state.pageEdits[state.currentEditPage] || [];
+
+  imageItems.forEach((imgItem) => {
+    // すでに移動された画像、または白塗り消去された画像は元位置のボックスを表示しない
+    const alreadyHandled = edits.some(e => 
+      (e.type === 'image' && e.origX !== undefined && Math.abs(e.origX - imgItem.x) < 4 && Math.abs(e.origY - imgItem.y) < 4) ||
+      (e.type === 'redact' && e.isImageMask && Math.abs(e.x - imgItem.x) < 4 && Math.abs(e.y - imgItem.y) < 4)
+    );
+    if (alreadyHandled) return;
+
+    const box = document.createElement('div');
+    box.className = 'image-item-box';
+    if (selectedEmbeddedImage && selectedEmbeddedImage.id === imgItem.id) {
+      box.classList.add('selected');
+    }
+    box.style.left = `${imgItem.x}px`;
+    box.style.top = `${imgItem.y}px`;
+    box.style.width = `${imgItem.width}px`;
+    box.style.height = `${imgItem.height}px`;
+    box.title = `埋め込み画像 (ドラッグして移動 / クリックしてDeleteで消去)`;
+
+    // バッジ
+    const badge = document.createElement('div');
+    badge.className = 'image-item-badge';
+    badge.innerHTML = `<i data-lucide="image"></i><span>画像/ロゴ</span>`;
+    box.appendChild(badge);
+
+    // クイック削除ボタン
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn-quick-img-delete';
+    deleteBtn.title = 'この画像を消去 (白塗り)';
+    deleteBtn.innerHTML = `×`;
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteEmbeddedImage(imgItem);
+    });
+    box.appendChild(deleteBtn);
+
+    // クリックで選択
+    box.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectEmbeddedImage(imgItem, box);
+    });
+
+    // ドラッグ移動ハンドラ
+    makeRawImageDraggable(box, imgItem);
+
+    container.appendChild(box);
+  });
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function selectEmbeddedImage(imgItem, boxElement) {
+  document.querySelectorAll('.image-item-box').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.text-item-box').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.user-el').forEach(el => el.classList.remove('selected'));
+  if (boxElement) boxElement.classList.add('selected');
+  selectedEmbeddedImage = imgItem;
+  state.selectedElementId = null;
+  activateTool('select');
+  showToast(`埋め込み画像 (${imgItem.width}x${imgItem.height}px) を選択中。ドラッグで移動、Deleteキーで消去できます`);
+}
+
+function deleteEmbeddedImage(imgItem) {
+  pushHistoryState();
+  const edits = state.pageEdits[state.currentEditPage] || [];
+  const redactEdit = {
+    id: `edit-redact-${Date.now()}`,
+    type: 'redact',
+    isImageMask: true,
+    origImgId: imgItem.id,
+    x: imgItem.x - 1,
+    y: imgItem.y - 1,
+    width: imgItem.width + 2,
+    height: imgItem.height + 2,
+    color: '#FFFFFF',
+    canvasWidth: dom.pdfRenderCanvas.width,
+    canvasHeight: dom.pdfRenderCanvas.height
+  };
+  edits.push(redactEdit);
+  state.selectedElementId = redactEdit.id;
+  selectedEmbeddedImage = null;
+  renderUserElements();
+  renderImageInteractionLayer(currentImageItems);
+  updateLayerList();
+  showToast('埋め込み画像を消去（白塗り）しました');
+}
+
+function ensureImageEditElement(imgItem) {
+  const edits = state.pageEdits[state.currentEditPage] || [];
+  let existing = edits.find(
+    e => e.type === 'image' && e.origX !== undefined &&
+         Math.abs(e.origX - imgItem.x) < 4 && Math.abs(e.origY - imgItem.y) < 4
+  );
+
+  if (!existing) {
+    existing = {
+      id: `edit-image-${Date.now()}`,
+      type: 'image',
+      isEmbedded: true,
+      x: imgItem.x,
+      y: imgItem.y,
+      origX: imgItem.x,
+      origY: imgItem.y,
+      origWidth: imgItem.width,
+      origHeight: imgItem.height,
+      width: imgItem.width,
+      height: imgItem.height,
+      dataUrl: imgItem.dataUrl,
+      canvasWidth: dom.pdfRenderCanvas.width,
+      canvasHeight: dom.pdfRenderCanvas.height
+    };
+    edits.push(existing);
+  }
+  return existing;
+}
+
+function makeRawImageDraggable(box, imgItem) {
+  let isDragging = false;
+  let startX, startY;
+  let hasMoved = false;
+  let targetEdit = null;
+  let currentDx = 0, currentDy = 0;
+  let rafId = null;
+
+  box.addEventListener('mousedown', (e) => {
+    if (state.activeTool !== 'select') return;
+    if (e.button !== 0) return;
+    if (e.target.classList.contains('btn-quick-img-delete')) return;
+
+    startX = e.clientX;
+    startY = e.clientY;
+    hasMoved = false;
+    isDragging = true;
+    targetEdit = null;
+
+    const onMouseMove = (ev) => {
+      if (!isDragging) return;
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+
+      if (!hasMoved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+        hasMoved = true;
+        targetEdit = ensureImageEditElement(imgItem);
+        state.selectedElementId = targetEdit.id;
+        renderUserElements();
+        renderImageInteractionLayer(currentImageItems);
+      }
+
+      if (hasMoved && targetEdit) {
+        currentDx = dx;
+        currentDy = dy;
+        if (!rafId) {
+          rafId = requestAnimationFrame(() => {
+            if (!isDragging) return;
+            const userEl = document.querySelector(`.user-el[data-id="${targetEdit.id}"]`);
+            if (userEl) {
+              userEl.style.transform = `translate3d(${currentDx}px, ${currentDy}px, 0)`;
+              userEl.classList.add('is-dragging');
+            }
+            rafId = null;
+          });
+        }
+      }
+    };
+
+    const onMouseUp = (ev) => {
+      if (!isDragging) return;
+      isDragging = false;
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+
+      if (hasMoved && targetEdit) {
+        const finalDx = ev.clientX - startX;
+        const finalDy = ev.clientY - startY;
+        pushHistoryState();
+        targetEdit.x = Math.round(targetEdit.origX + finalDx);
+        targetEdit.y = Math.round(targetEdit.origY + finalDy);
+        state.selectedElementId = targetEdit.id;
+        renderUserElements();
+        renderImageInteractionLayer(currentImageItems);
+        updateLayerList();
+        showToast('画像を移動しました（元の位置は白塗り消去されます）');
+      }
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  });
+}
+
 
 function renderTextInteractionLayer(items) {
   const container = dom.textInteractionLayer;
@@ -1708,7 +2378,7 @@ function applyHighlightToCurrentSelection(customColor = null) {
     return false;
   }
 
-  const color = customColor || state.activeHighlightColor || '#FFF275';
+  const color = customColor || state.activeHighlightColor || '#FFE600';
   const edits = state.pageEdits[state.currentEditPage] || [];
   let addedCount = 0;
 
@@ -1719,19 +2389,19 @@ function applyHighlightToCurrentSelection(customColor = null) {
   clientRects.forEach((r, idx) => {
     if (r.width < 1 || r.height < 1) return;
 
-    // canvasStage相対座標に変換
-    const x = Math.max(0, r.left - stageRect.left - 1);
-    const y = Math.max(0, r.top - stageRect.top);
-    const width = Math.max(r.width + 2, 4);
-    const height = Math.max(r.height, 8);
+    // canvasStage相対座標に変換（上下に1pxのゆとりを持たせ、Adobe Readerのように文字を美しく包み込む）
+    const x = Math.max(0, Math.round(r.left - stageRect.left - 1));
+    const y = Math.max(0, Math.round(r.top - stageRect.top - 1));
+    const width = Math.max(Math.round(r.width + 2), 4);
+    const height = Math.max(Math.round(r.height + 2), 8);
 
     const newHighlight = {
       id: `highlight-${Date.now()}-${idx}`,
       type: 'highlight',
-      x: Math.round(x),
-      y: Math.round(y),
-      width: Math.round(width),
-      height: Math.round(height),
+      x: x,
+      y: y,
+      width: width,
+      height: height,
       color: color,
       canvasWidth: dom.pdfRenderCanvas.width,
       canvasHeight: dom.pdfRenderCanvas.height
@@ -1741,8 +2411,9 @@ function applyHighlightToCurrentSelection(customColor = null) {
     addedCount++;
   });
 
-  // 選択解除
+  // 選択解除＆選択ボックスの枠線クリーンアップ
   selection.removeAllRanges();
+  document.querySelectorAll('.text-item-box.selected').forEach(b => b.classList.remove('selected'));
   hideQuickHighlightPopup();
 
   renderUserElements();
@@ -1798,13 +2469,52 @@ function hideQuickHighlightPopup() {
 
 function getTextItemFontSize(item) {
   if (!item) return 14;
-  if (typeof item.fontSize === 'number' && item.fontSize > 0) {
-    return Math.max(8, Math.min(72, Math.round(item.fontSize)));
+
+  const actualHeight = (typeof item.height === 'number' && item.height > 0) ? item.height : 0;
+  const nominalSize = (typeof item.fontSize === 'number' && item.fontSize > 0) ? item.fontSize : 0;
+
+  let visualSize = 14;
+
+  if (actualHeight > 0 && nominalSize > 0) {
+    // PDFではフォントのem square設定やスケーリングにより、
+    // 名目サイズ(nominalSize)が実際の文字の描画高さ(actualHeight)よりも大幅に大きいケースが頻出する。
+    // その場合、名目サイズを採用するとプレビュー表示時よりも文字が巨大化してしまうため、
+    // 画面上で見えている実際の文字高さ（actualHeight）を基準に正確に合わせる。
+    if (nominalSize > actualHeight * 1.1) {
+      visualSize = actualHeight * 0.95;
+    } else if (nominalSize < actualHeight * 0.6) {
+      visualSize = actualHeight * 0.85;
+    } else {
+      visualSize = Math.min(nominalSize, actualHeight * 0.95);
+    }
+  } else if (actualHeight > 0) {
+    visualSize = actualHeight * 0.9;
+  } else if (nominalSize > 0) {
+    visualSize = nominalSize;
   }
-  if (typeof item.height === 'number' && item.height > 0) {
-    return Math.max(8, Math.min(72, Math.round(item.height)));
+
+  // 文字列の幅と文字数から、1文字あたりの幅による検証・微調整
+  if (item.str && item.str.trim().length > 0 && typeof item.width === 'number' && item.width > 0) {
+    const text = item.str.trim();
+    let weight = 0;
+    for (let i = 0; i < text.length; i++) {
+      const code = text.charCodeAt(i);
+      if (code < 128 || (code >= 0xff61 && code <= 0xff9f)) {
+        weight += 0.55;
+      } else {
+        weight += 1.0;
+      }
+    }
+    if (weight > 0) {
+      const avgCharWidth = item.width / weight;
+      // 日本語の全角文字は幅と高さがほぼ等しいため、計算されたsizeが文字幅より著しく大きい場合は文字幅に合わせる
+      if (visualSize > avgCharWidth * 1.25) {
+        visualSize = avgCharWidth;
+      }
+    }
   }
-  return 14;
+
+  return Math.max(8, Math.min(72, Math.round(visualSize)));
 }
 
 function ensureTextEditElement(item) {
@@ -1818,6 +2528,12 @@ function ensureTextEditElement(item) {
 
   if (!existing) {
     const calculatedFontSize = getTextItemFontSize(item);
+    const fontToUse = (item && item.detectedFont && item.detectedFont.fontFamily)
+      ? item.detectedFont.fontFamily
+      : (dom.textFontFamily ? dom.textFontFamily.value : "'Noto Sans JP', sans-serif");
+    const isBold = (item && item.detectedFont) ? !!item.detectedFont.bold : (state.activeTextProp.bold || false);
+    const isItalic = (item && item.detectedFont) ? !!item.detectedFont.italic : (state.activeTextProp.italic || false);
+
     existing = {
       id: `edit-text-${Date.now()}`,
       type: 'text',
@@ -1832,10 +2548,10 @@ function ensureTextEditElement(item) {
       height: Math.max(item.height, 16),
       text: item.str,
       fontSize: calculatedFontSize,
-      fontFamily: dom.textFontFamily.value,
+      fontFamily: fontToUse,
       color: state.activeTextProp.color || '#000000',
-      bold: state.activeTextProp.bold || false,
-      italic: state.activeTextProp.italic || false,
+      bold: isBold,
+      italic: isItalic,
       maskBg: dom.textBgMask.checked,
       canvasWidth: dom.pdfRenderCanvas.width,
       canvasHeight: dom.pdfRenderCanvas.height
@@ -1878,15 +2594,25 @@ function selectAndEditText(textItem, boxElement) {
       dom.textFontFamily.value = existing.fontFamily;
     }
   } else {
-    // クリックしただけでは編集要素を追加せず、サイドバーに入力情報を同期するのみ
+    // クリックしただけでは編集要素を追加せず、サイドバーに入力情報を同期
     state.selectedElementId = null;
     dom.activeTextInput.value = textItem.str;
     dom.textFontSizeRange.value = calculatedFontSize;
     dom.textFontSizeVal.textContent = `${calculatedFontSize}px`;
-    dom.btnToggleBold.classList.remove('active');
-    dom.btnToggleItalic.classList.remove('active');
-    if (dom.textFontFamily) {
-      dom.textFontFamily.value = state.activeTextProp.fontFamily || "'Noto Sans JP', sans-serif";
+
+    // 検出された元フォント・スタイルをサイドバーのデフォルト値に適用
+    if (textItem.detectedFont) {
+      selectFontFamily(textItem.detectedFont.fontFamily);
+      dom.btnToggleBold.classList.toggle('active', !!textItem.detectedFont.bold);
+      dom.btnToggleItalic.classList.toggle('active', !!textItem.detectedFont.italic);
+      state.activeTextProp.bold = !!textItem.detectedFont.bold;
+      state.activeTextProp.italic = !!textItem.detectedFont.italic;
+    } else {
+      dom.btnToggleBold.classList.remove('active');
+      dom.btnToggleItalic.classList.remove('active');
+      if (dom.textFontFamily) {
+        dom.textFontFamily.value = state.activeTextProp.fontFamily || "'Noto Sans JP', sans-serif";
+      }
     }
   }
 
@@ -1912,6 +2638,25 @@ function createInlineEditor(textItem, targetEdit = null) {
     );
   }
 
+  // 検出されたフォント・スタイル情報を取得
+  const detected = textItem ? textItem.detectedFont : null;
+  const initialFont = targetEdit
+    ? (targetEdit.fontFamily || 'Noto Sans JP, sans-serif')
+    : (detected ? detected.fontFamily : (state.activeTextProp.fontFamily || dom.textFontFamily.value));
+  const initialBold = targetEdit
+    ? !!targetEdit.bold
+    : (detected ? !!detected.bold : !!state.activeTextProp.bold);
+  const initialItalic = targetEdit
+    ? !!targetEdit.italic
+    : (detected ? !!detected.italic : !!state.activeTextProp.italic);
+
+  // サイドバーのフォントセレクタ・スタイルボタンも元テキストのフォントと同期
+  selectFontFamily(initialFont);
+  dom.btnToggleBold.classList.toggle('active', initialBold);
+  dom.btnToggleItalic.classList.toggle('active', initialItalic);
+  state.activeTextProp.bold = initialBold;
+  state.activeTextProp.italic = initialItalic;
+
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'inline-text-editor';
@@ -1921,15 +2666,18 @@ function createInlineEditor(textItem, targetEdit = null) {
   const currentWidth = targetEdit ? Math.max(targetEdit.width + 30, 140) : Math.max(textItem.width + 30, 140);
   const currentSize = targetEdit ? targetEdit.fontSize : getTextItemFontSize(textItem);
 
+  const currentHeight = targetEdit ? Math.max(targetEdit.height, currentSize * 1.2) : Math.max(textItem.height, currentSize * 1.2);
+
   input.style.left = `${currentX}px`;
   input.style.top = `${currentY}px`;
   input.style.minWidth = `${currentWidth}px`;
+  input.style.height = `${Math.round(currentHeight + 2)}px`;
   input.style.fontSize = `${currentSize}px`;
-  input.style.lineHeight = '1.25';
-  input.style.fontFamily = targetEdit ? (targetEdit.fontFamily || 'Noto Sans JP, sans-serif') : (state.activeTextProp.fontFamily || dom.textFontFamily.value);
+  input.style.lineHeight = `${Math.round(currentHeight)}px`;
+  input.style.fontFamily = initialFont;
   input.style.color = targetEdit ? (targetEdit.color || '#000000') : (state.activeTextProp.color || '#000000');
-  if (targetEdit ? targetEdit.bold : state.activeTextProp.bold) input.style.fontWeight = 'bold';
-  if (targetEdit ? targetEdit.italic : state.activeTextProp.italic) input.style.fontStyle = 'italic';
+  if (initialBold) input.style.fontWeight = 'bold';
+  if (initialItalic) input.style.fontStyle = 'italic';
 
   dom.canvasStage.appendChild(input);
   input.focus();
@@ -2080,14 +2828,17 @@ function renderUserElements() {
   cleanupPristineEdits();
   const container = dom.userElementsLayer;
   container.innerHTML = '';
+  if (dom.highlightElementsLayer) {
+    dom.highlightElementsLayer.innerHTML = '';
+  }
 
   const edits = state.pageEdits[state.currentEditPage] || [];
 
-  // 移動または変更されたテキストの「元位置の白塗りマスク」を先に描画（文字ダブりの完全防止！）
+  // 移動または変更されたテキスト・画像の「元位置の白塗りマスク」を先に描画（ダブりの完全防止！）
   edits.forEach((edit) => {
-    if (edit.type === 'text' && edit.origX !== undefined) {
+    if (edit.origX !== undefined) {
       const isMoved = Math.abs(edit.x - edit.origX) > 2 || Math.abs(edit.y - edit.origY) > 2;
-      const isTextChanged = edit.origText !== undefined && edit.text !== edit.origText;
+      const isTextChanged = edit.type === 'text' && edit.origText !== undefined && edit.text !== edit.origText;
       if (isMoved || isTextChanged || edit.maskBg) {
         const origMask = document.createElement('div');
         origMask.className = 'user-orig-mask';
@@ -2101,8 +2852,33 @@ function renderUserElements() {
   });
 
   edits.forEach((edit) => {
-    const el = document.createElement('div');
     const isSelected = state.selectedElementId === edit.id;
+
+    // ハイライト要素は直下のCanvasと真の乗算合成（multiply）を行うため専用レイヤーに配置
+    if (edit.type === 'highlight') {
+      const hlContainer = dom.highlightElementsLayer || container;
+      const hlEl = document.createElement('div');
+      hlEl.className = `user-highlight-el ${isSelected ? 'selected' : ''}`;
+      hlEl.style.left = `${edit.x}px`;
+      hlEl.style.top = `${edit.y}px`;
+      hlEl.style.width = `${edit.width}px`;
+      hlEl.style.height = `${edit.height}px`;
+      hlEl.style.backgroundColor = edit.color || '#FFE600';
+      hlEl.dataset.id = edit.id;
+
+      hlEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.selectedElementId = edit.id;
+        document.querySelectorAll('.user-el, .user-highlight-el').forEach(elem => elem.classList.remove('selected'));
+        hlEl.classList.add('selected');
+        updateLayerList();
+      });
+
+      hlContainer.appendChild(hlEl);
+      return;
+    }
+
+    const el = document.createElement('div');
     el.className = `user-el ${isSelected ? 'selected' : ''}`;
     el.style.left = `${edit.x}px`;
     el.style.top = `${edit.y}px`;
@@ -2130,7 +2906,7 @@ function renderUserElements() {
         if (dom.textFontFamily && edit.fontFamily) {
           dom.textFontFamily.value = edit.fontFamily;
         }
-        document.querySelectorAll('.user-el').forEach(elem => elem.classList.remove('selected'));
+        document.querySelectorAll('.user-el, .user-highlight-el').forEach(elem => elem.classList.remove('selected'));
         el.classList.add('selected');
         updateLayerList();
       });
@@ -2150,21 +2926,7 @@ function renderUserElements() {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         state.selectedElementId = edit.id;
-        document.querySelectorAll('.user-el').forEach(elem => elem.classList.remove('selected'));
-        el.classList.add('selected');
-        updateLayerList();
-      });
-
-    } else if (edit.type === 'highlight') {
-      el.className += ' user-highlight-el';
-      el.style.width = `${edit.width}px`;
-      el.style.height = `${edit.height}px`;
-      el.style.backgroundColor = edit.color || '#FFF275';
-
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        state.selectedElementId = edit.id;
-        document.querySelectorAll('.user-el').forEach(elem => elem.classList.remove('selected'));
+        document.querySelectorAll('.user-el, .user-highlight-el').forEach(elem => elem.classList.remove('selected'));
         el.classList.add('selected');
         updateLayerList();
       });
@@ -2186,7 +2948,7 @@ function renderUserElements() {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         state.selectedElementId = edit.id;
-        document.querySelectorAll('.user-el').forEach(elem => elem.classList.remove('selected'));
+        document.querySelectorAll('.user-el, .user-highlight-el').forEach(elem => elem.classList.remove('selected'));
         el.classList.add('selected');
         updateLayerList();
       });
@@ -2220,18 +2982,18 @@ function makeElementDraggable(el, edit) {
 
     let beforeDragEdits = JSON.parse(JSON.stringify(state.pageEdits[state.currentEditPage] || []));
 
-    // テキスト要素で元位置情報が未保存の場合は保存
-    if (edit.type === 'text' && edit.origX === undefined) {
+    // テキスト要素または埋め込み画像で元位置情報が未保存の場合は保存
+    if (edit.origX === undefined && (edit.type === 'text' || edit.isEmbedded)) {
       edit.origX = edit.x;
       edit.origY = edit.y;
       edit.origWidth = edit.width || 30;
       edit.origHeight = edit.height || 16;
-      edit.origText = edit.text;
+      if (edit.type === 'text') edit.origText = edit.text;
     }
 
     // Fast selection without destroying DOM
     state.selectedElementId = edit.id;
-    document.querySelectorAll('.user-el').forEach(elem => elem.classList.remove('selected'));
+    document.querySelectorAll('.user-el, .user-highlight-el').forEach(elem => elem.classList.remove('selected'));
     el.classList.add('selected');
     el.classList.add('is-dragging');
     updateLayerList();
@@ -2345,11 +3107,11 @@ function updateLayerList() {
     if (edit.type === 'text') {
       label = `✏️ "${edit.text}"`;
     } else if (edit.type === 'redact') {
-      label = `🔲 墨消し (${edit.color === '#FFFFFF' ? '白塗り' : '黒塗り'})`;
+      label = edit.isImageMask ? `⬜ 埋め込み画像の消去` : `🔲 墨消し (${edit.color === '#FFFFFF' ? '白塗り' : '黒塗り'})`;
     } else if (edit.type === 'highlight') {
       label = `🖍️ ハイライト`;
     } else if (edit.type === 'image') {
-      label = `🖼️ 画像埋め込み (${edit.width}x${edit.height})`;
+      label = edit.isEmbedded ? `🖼️ 埋め込み画像 (移動)` : `🖼️ 画像埋め込み (${edit.width}x${edit.height})`;
     }
 
     div.innerHTML = `
@@ -2377,6 +3139,7 @@ window.removePageEdit = (id) => {
   state.pageEdits[state.currentEditPage] = state.pageEdits[state.currentEditPage].filter(e => e.id !== id);
   if (state.selectedElementId === id) state.selectedElementId = null;
   renderUserElements();
+  renderImageInteractionLayer(currentImageItems);
   updateLayerList();
 };
 
@@ -2390,6 +3153,10 @@ function activateTool(toolName) {
   dom.panelImageOptions.classList.toggle('hidden', toolName !== 'image');
 
   dom.textInteractionLayer.classList.toggle('select-mode', toolName === 'select');
+  if (dom.imageInteractionLayer) {
+    dom.imageInteractionLayer.classList.toggle('select-mode', toolName === 'select');
+    dom.imageInteractionLayer.style.pointerEvents = 'none';
+  }
 
   if (toolName === 'highlight') {
     dom.textInteractionLayer.style.pointerEvents = 'auto';
@@ -2418,6 +3185,12 @@ function initEditListeners() {
     }
 
     if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (selectedEmbeddedImage) {
+        e.preventDefault();
+        deleteEmbeddedImage(selectedEmbeddedImage);
+        selectedEmbeddedImage = null;
+        return;
+      }
       if (state.selectedElementId) {
         e.preventDefault();
         window.removePageEdit(state.selectedElementId);
@@ -2584,25 +3357,61 @@ function initEditListeners() {
     dom.btnLoadPcFonts.addEventListener('click', loadLocalPcFonts);
   }
 
-  // Font Search (Incremental Search & Direct Custom Font)
+  // Font Search (Incremental Search & Floating Suggestion Dropdown)
   if (dom.fontSearchInput) {
     dom.fontSearchInput.addEventListener('input', (e) => {
       filterFontSelect(e.target.value);
     });
 
+    dom.fontSearchInput.addEventListener('focus', () => {
+      if (dom.fontSearchInput.value.trim()) {
+        renderFontSuggestions(dom.fontSearchInput.value.trim());
+      }
+    });
+
     dom.fontSearchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
+      const dropdown = dom.fontSuggestionsDropdown;
+      const isOpen = dropdown && !dropdown.classList.contains('hidden');
+
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (isOpen) {
+          e.preventDefault();
+          const items = Array.from(dropdown.querySelectorAll('.font-sugg-item'));
+          if (items.length > 0) {
+            let activeIdx = items.findIndex(it => it.classList.contains('active'));
+            if (activeIdx >= 0) items[activeIdx].classList.remove('active');
+
+            if (e.key === 'ArrowDown') {
+              activeIdx = (activeIdx + 1) % items.length;
+            } else {
+              activeIdx = (activeIdx - 1 + items.length) % items.length;
+            }
+
+            const nextActive = items[activeIdx];
+            nextActive.classList.add('active');
+            nextActive.scrollIntoView({ block: 'nearest' });
+          }
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (dom.textFontFamily) dom.textFontFamily.focus();
+        }
+      } else if (e.key === 'Enter') {
         e.preventDefault();
         const val = dom.fontSearchInput.value.trim();
+        if (isOpen) {
+          const activeItem = dropdown.querySelector('.font-sugg-item.active') || 
+                             dropdown.querySelector('.font-sugg-item');
+          if (activeItem) {
+            selectFontFamily(activeItem.dataset.value, activeItem.dataset.text);
+            return;
+          }
+        }
         if (val) {
           applyCustomFontDirect(val);
+          closeFontSuggestions();
         }
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (dom.textFontFamily) dom.textFontFamily.focus();
       } else if (e.key === 'Escape') {
-        dom.fontSearchInput.value = '';
-        filterFontSelect('');
+        closeFontSuggestions();
       }
     });
   }
@@ -2612,10 +3421,18 @@ function initEditListeners() {
       if (dom.fontSearchInput) {
         dom.fontSearchInput.value = '';
         filterFontSelect('');
+        closeFontSuggestions();
         dom.fontSearchInput.focus();
       }
     });
   }
+
+  // ドロップダウンの外側クリックで閉じる
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.font-search-bar-wrap')) {
+      closeFontSuggestions();
+    }
+  });
 
   // Font Family Select Change
   if (dom.textFontFamily) {
@@ -2674,11 +3491,19 @@ function initEditListeners() {
     });
   });
 
-  // Canvas Stage Mouseup - 文字ドラッグ選択完了時にクイックハイライトポップアップを表示
+  // Canvas Stage Mouseup - 文字ドラッグ選択完了時の挙動
   dom.canvasStage.addEventListener('mouseup', () => {
     setTimeout(() => {
+      // 「文字ハイライト」ツールがアクティブな場合は、ドラッグ選択完了直後にAdobe Reader同様に即座にハイライトを自動適用！
+      if (state.activeTool === 'highlight') {
+        const sel = window.getSelection();
+        if (sel && sel.toString().trim().length > 0) {
+          applyHighlightToCurrentSelection();
+          return;
+        }
+      }
       checkAndShowQuickHighlightPopup();
-    }, 30);
+    }, 40);
   });
 
   // 画面クリックで選択解除されたらポップアップを閉じる
