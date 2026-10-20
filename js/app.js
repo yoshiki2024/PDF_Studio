@@ -1505,7 +1505,8 @@ async function executeMerge() {
     const mergedBytes = await pdfEngine.mergeDocuments(state.mergeItems);
     const filename = dom.mergeFilename.value.trim() || '結合完了.pdf';
 
-    await savePdfFile(mergedBytes, filename);
+    const saved = await savePdfFile(mergedBytes, filename);
+    if (!saved) return;
     showToast('結合が完了しました！新規ファイルとして保存されました。', 'success');
   } catch (err) {
     console.error(err);
@@ -1644,7 +1645,8 @@ async function executeSplit() {
     const splitResults = await pdfEngine.splitDocument(state.primaryDoc, selectedItems);
 
     // Save directly to folder or zip
-    await saveMultiplePdfFiles(splitResults);
+    const saved = await saveMultiplePdfFiles(splitResults);
+    if (!saved) return;
     showToast('分解処理が完了しました！新規ファイル群として出力されました。', 'success');
   } catch (err) {
     console.error(err);
@@ -1772,7 +1774,8 @@ async function executeRotate() {
     const baseName = state.primaryDoc.name.replace(/\.[^/.]+$/, "");
     const filename = `${baseName}_向き修正.pdf`;
 
-    await savePdfFile(rotatedBytes, filename);
+    const saved = await savePdfFile(rotatedBytes, filename);
+    if (!saved) return;
     showToast('向きの変更が完了しました！新規ファイルとして保存されました。', 'success');
   } catch (err) {
     console.error(err);
@@ -3894,7 +3897,8 @@ async function executeFinalExport() {
     const pdfBytes = await pdfEngine.applyEditsToDocument(state.primaryDoc, state.pageEdits);
     const filename = dom.finalExportFilename.value.trim() || '完成書類.pdf';
 
-    await savePdfFile(pdfBytes, filename);
+    const saved = await savePdfFile(pdfBytes, filename);
+    if (!saved) return;
     showToast('新規PDFとして正常に出力保存されました！', 'success');
   } catch (err) {
     console.error(err);
@@ -3919,9 +3923,9 @@ async function savePdfFile(pdfBytes, defaultFilename) {
       const writable = await handle.createWritable();
       await writable.write(pdfBytes);
       await writable.close();
-      return;
+      return true;
     } catch (err) {
-      if (err.name === 'AbortError') return; // User cancelled
+      if (err.name === 'AbortError') return false; // User cancelled
       console.warn('showSaveFilePicker fallback to download', err);
     }
   }
@@ -3936,6 +3940,7 @@ async function savePdfFile(pdfBytes, defaultFilename) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  return true;
 }
 
 async function saveMultiplePdfFiles(files) {
@@ -3949,9 +3954,9 @@ async function saveMultiplePdfFiles(files) {
         await writable.write(f.bytes);
         await writable.close();
       }
-      return;
+      return true;
     } catch (err) {
-      if (err.name === 'AbortError') return;
+      if (err.name === 'AbortError') return false;
       console.warn('showDirectoryPicker fallback to zip download', err);
     }
   }
@@ -3971,5 +3976,7 @@ async function saveMultiplePdfFiles(files) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    return true;
   }
+  return false;
 }
